@@ -15,9 +15,10 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
     import librosa
+    from scipy.interpolate import interp1d
 
     mo.md("# Pitch detection")
-    return Audio, Path, librosa, mo, np, plt, torch, torchaudio
+    return Audio, Path, interp1d, librosa, mo, np, plt, torch, torchaudio
 
 
 @app.cell(hide_code=True)
@@ -25,6 +26,9 @@ def _(mo):
     mo.md(
         """
         ## Some TODOS
+
+        ⚠️ **Instead of making up a bell curve at a given frequency, use stft of a sine wave at that frequency with the same window that is used to generate the spectrogram of the target signal.**
+
         - [ ] If a pitch does not correspond exactly to an FFT bin it has to be normalized. We can normalize the area under the curve or we can redistribute the actual peaks value to the surrounding bins proportionally, and then normalize.
         - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
         """
@@ -33,16 +37,7 @@ def _(mo):
 
 
 @app.cell
-def p_1(
-    N_FFT,
-    SAMPLE_RATE,
-    d_CENTS_FACTOR,
-    d_HOP_LENGTH,
-    librosa,
-    np,
-    plt,
-    torch,
-):
+def p_1(N_FFT, SAMPLE_RATE, d_HOP_LENGTH, librosa, np, plt, torch):
     def plot_waveform(waveform, SAMPLE_RATE):
         waveform = waveform.numpy()
 
@@ -69,7 +64,7 @@ def p_1(
         )
         time_axis = (np.arange(0, num_frames) / num_frames) * end_time
         figure, axis = plt.subplots(1, 1)
-        axis.plot(time_axis, x / d_CENTS_FACTOR, linewidth=1)
+        axis.plot(time_axis, x, linewidth=1)
         axis.grid(True)
         figure.suptitle(title)
 
@@ -84,49 +79,53 @@ def _(Audio, SAMPLE_RATE, mo, np, plot_waveform, plt, spectrogram, waveform):
             mo.md("## Wave File"),
             mo.hstack(
                 items=[
-                    plot_waveform(waveform, SAMPLE_RATE),
+                    mo.vstack(
+                        items=[
+                            plot_waveform(waveform, SAMPLE_RATE),
+                            Audio(data=waveform, rate=SAMPLE_RATE),
+                        ]
+                    ),
                     plt.matshow(
-                        np.log(1e-8 + spectrogram.flip(0).numpy()), cmap="viridis"
+                        np.log(1e-8 + spectrogram.flip(0).numpy()),
+                        cmap="viridis",
                     ),
                 ]
             ),
-            Audio(data=waveform, rate=SAMPLE_RATE),
         ]
     )
     return
 
 
 @app.cell
-def _(mo):
-    spec_power = mo.ui.slider(1.0, 4.0, 0.1, label="Spectrogram power")
-
-    mo.vstack(items=[mo.md("## Adjustable Parameters"), spec_power])
-    return (spec_power,)
-
-
-@app.cell
-def _(Path, spec_power):
-    SAMPLE_WAV = Path("/home/kureta/Music/Flute Samples/01. Air.wav")
+def _(Path, np):
+    SAMPLE_WAV = Path(
+        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
+    )
 
     N_FFT = 2048
-    OVERLAP_RATIO = 2
+    OVERLAP_RATIO = 4
 
-    SPECTROGRAM_POWER = spec_power.value
-    WIN_NAME = "hann"  # "hann" "hamming" "triangle"
+    SPECTROGRAM_POWER = 1.0
+    WIN_NAME = "hamming"  # "hann" "hamming" "triangle"
     SPECTROGRAM_NORMALIZATION = False  # "window" or "frame_length" or False
 
-    LOWEST_MIDI_NOTE = 36  # C 2
-    HIGHEST_MIDI_NOTE = 84  # C 6
-    ERROR_IN_CENTS = 7
+    LOWEST_MIDI_NOTE = 60
+    HIGHEST_MIDI_NOTE = 96
+    N_OVERTONES = 20
 
-    CENTS_RESOLUTION = 10
+    CENTS_RESOLUTION = 5
+
+
+    def OVERTONE_SCALING(idx):
+        return 1 / np.sqrt(idx)
     return (
         CENTS_RESOLUTION,
-        ERROR_IN_CENTS,
         HIGHEST_MIDI_NOTE,
         LOWEST_MIDI_NOTE,
         N_FFT,
+        N_OVERTONES,
         OVERLAP_RATIO,
+        OVERTONE_SCALING,
         SAMPLE_WAV,
         SPECTROGRAM_NORMALIZATION,
         SPECTROGRAM_POWER,
@@ -135,29 +134,38 @@ def _(Path, spec_power):
 
 
 @app.cell
+def _(mo):
+    offset = mo.ui.slider(0.0, 60.0, 0.5, label="Start offset in seconds.")
+
+    offset
+    return (offset,)
+
+
+@app.cell
 def _(
     CENTS_RESOLUTION,
-    ERROR_IN_CENTS,
     N_FFT,
     OVERLAP_RATIO,
     SAMPLE_WAV,
     WIN_NAME,
     librosa,
+    offset,
     torchaudio,
 ):
     waveform, SAMPLE_RATE = torchaudio.load(SAMPLE_WAV)
-    waveform = waveform[:, int(1.5 * SAMPLE_RATE) : int(12.5 * SAMPLE_RATE)]
+    waveform = waveform[
+        :,
+        int(offset.value * SAMPLE_RATE) : int((offset.value + 10.0) * SAMPLE_RATE),
+    ]
 
     d_WIN_LENGTH = N_FFT
     d_HOP_LENGTH = N_FFT // OVERLAP_RATIO
     d_WINDOW = librosa.filters.get_window(WIN_NAME, d_WIN_LENGTH)
-    d_ERROR = ERROR_IN_CENTS / 100
     d_FFT_FREQS = librosa.fft_frequencies(sr=SAMPLE_RATE, n_fft=N_FFT)
     d_CENTS_FACTOR = 100 // CENTS_RESOLUTION
     return (
         SAMPLE_RATE,
         d_CENTS_FACTOR,
-        d_ERROR,
         d_FFT_FREQS,
         d_HOP_LENGTH,
         d_WINDOW,
@@ -171,10 +179,12 @@ def _(
     HIGHEST_MIDI_NOTE,
     LOWEST_MIDI_NOTE,
     N_FFT,
+    N_OVERTONES,
+    OVERTONE_SCALING,
+    SAMPLE_RATE,
     SPECTROGRAM_NORMALIZATION,
     SPECTROGRAM_POWER,
     d_CENTS_FACTOR,
-    d_ERROR,
     d_FFT_FREQS,
     d_HOP_LENGTH,
     d_WINDOW,
@@ -185,34 +195,37 @@ def _(
     torchaudio,
     waveform,
 ):
-    def normal(mean, variance):
-        factor = 1 / np.sqrt(variance * 2 * np.pi)
+    def pure_sine_bin(hz, amp=1.0):
+        time = np.arange(N_FFT) / SAMPLE_RATE
+        # TODO: adding random phase seems to improve the situation
+        # wave = amp * np.sin(2 * np.pi * hz * time + np.random.uniform(-np.pi, np.pi, 1)[0])
+        wave = amp * np.sin(2 * np.pi * hz * time)
 
-        def curve(x):
-            return factor * np.exp(-((x - mean) ** 2) / variance)
+        peak = torchaudio.functional.spectrogram(
+            waveform=torch.from_numpy(wave).unsqueeze(0),
+            pad=0,
+            window=torch.from_numpy(d_WINDOW),
+            n_fft=N_FFT,
+            hop_length=d_HOP_LENGTH,
+            win_length=d_WIN_LENGTH,
+            power=SPECTROGRAM_POWER,
+            normalized=SPECTROGRAM_NORMALIZATION,
+            center=False,
+        )
 
-        return curve
-
-
-    def normalized_normal(hz):
-        result = normal(
-            hz, librosa.midi_to_hz(librosa.hz_to_midi(hz) + d_ERROR) - hz
-        )(d_FFT_FREQS)
-        if result.sum() == 0.0:
-            return result
-        return result / result.sum()
+        return peak[0, :, 0].numpy()
 
 
     def harmonics(hz, n=20):
         result = np.zeros_like(d_FFT_FREQS)
         for idx in range(1, n + 1):
-            result += normalized_normal(hz * idx) / np.sqrt(idx)
+            result += pure_sine_bin(hz * idx, OVERTONE_SCALING(idx))
         return result
 
 
     factors = np.stack(
         [
-            harmonics(librosa.midi_to_hz(n / d_CENTS_FACTOR))
+            harmonics(librosa.midi_to_hz(n / d_CENTS_FACTOR), n=N_OVERTONES)
             for n in range(
                 LOWEST_MIDI_NOTE * d_CENTS_FACTOR,
                 HIGHEST_MIDI_NOTE * d_CENTS_FACTOR + 1,
@@ -233,22 +246,83 @@ def _(
     )
 
     result = factors @ spectrogram.numpy()
-    return factors, harmonics, normal, normalized_normal, result, spectrogram
+    pitch = np.argmax(result, axis=0) / d_CENTS_FACTOR + LOWEST_MIDI_NOTE
+    confidence = np.max(result, axis=0) / spectrogram.sum(dim=0).numpy() / N_FFT
+    amplitude = spectrogram.sum(dim=0) / N_FFT
+
+    # Mask amplitude with confidence
+    min_confidence = 0.05
+    amplitude[confidence <= min_confidence] = 0.0
+    return (
+        amplitude,
+        confidence,
+        factors,
+        harmonics,
+        min_confidence,
+        pitch,
+        pure_sine_bin,
+        result,
+        spectrogram,
+    )
 
 
 @app.cell
-def _(mo, np, plot_with_title, result):
-    mo.vstack(
+def _(confidence, mo, pitch, plot_with_title):
+    mo.hstack(
         items=[
-            mo.hstack(
-                items=[
-                    # plot_with_title(_WINDOW, WIN_NAME),
-                    plot_with_title(np.argmax(result, axis=0), "Pitch"),
-                    plot_with_title(np.log2(np.max(result, axis=0)), "Confidence"),
-                ]
-            ),
+            plot_with_title(pitch, "Pitch"),
+            plot_with_title(confidence, "Confidence"),
         ]
     )
+    return
+
+
+@app.cell
+def _(SAMPLE_RATE, amplitude, interp1d, librosa, np, pitch, waveform):
+    duration = 10.0
+    t_audio = np.linspace(0, duration, waveform.shape[1], endpoint=False)
+    t_control = np.linspace(0, duration, pitch.shape[0], endpoint=False)
+
+    # convert pitch information from midi, to cycles per second, to radians per sample
+    cycles_per_second = librosa.midi_to_hz(pitch)
+    radians_per_second = 2 * np.pi * cycles_per_second
+    radians_per_sample = radians_per_second / SAMPLE_RATE
+
+    # Interpolate control frequencies to match the audio sample rate
+    f_interp_radians_per_sample = interp1d(
+        t_control, radians_per_sample, kind="linear", fill_value="extrapolate"
+    )
+    audio_radians_per_sample = f_interp_radians_per_sample(t_audio)
+
+    # accumulate them into phase
+    audio_phase = np.cumsum(audio_radians_per_sample)
+
+    interp_amps = interp1d(
+        t_control, amplitude, kind="linear", fill_value="extrapolate"
+    )
+    audio_amps = interp_amps(t_audio)
+
+    # # Generate the sine wave
+    sine_wave = audio_amps * np.sin(audio_phase)
+    return (
+        audio_amps,
+        audio_phase,
+        audio_radians_per_sample,
+        cycles_per_second,
+        duration,
+        f_interp_radians_per_sample,
+        interp_amps,
+        radians_per_sample,
+        radians_per_second,
+        sine_wave,
+        t_audio,
+        t_control,
+    )
+
+
+@app.cell
+def _(Audio, SAMPLE_RATE, sine_wave):
+    Audio(data=sine_wave, rate=SAMPLE_RATE)
     return
 
 
