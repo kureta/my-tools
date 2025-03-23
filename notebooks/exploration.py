@@ -17,8 +17,21 @@ def _():
     import librosa
     from scipy.interpolate import interp1d
 
+    from my_tools.pitch_detector import PitchDetector
+
     mo.md("# Pitch detection")
-    return Audio, Path, interp1d, librosa, mo, np, plt, torch, torchaudio
+    return (
+        Audio,
+        Path,
+        PitchDetector,
+        interp1d,
+        librosa,
+        mo,
+        np,
+        plt,
+        torch,
+        torchaudio,
+    )
 
 
 @app.cell(hide_code=True)
@@ -32,13 +45,21 @@ def _(mo):
         - [ ] If a pitch does not correspond exactly to an FFT bin it has to be normalized. We can normalize the area under the curve or we can redistribute the actual peaks value to the surrounding bins proportionally, and then normalize.
         - [ ] Using stft at that frequency instead of the above method. But should revisit that.
         - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
+        - [ ] Refactor synthesizer into its own class
+        - [ ] Implement everything in torch/torchaudio and ditch numpy. numpy can only be used during initialization, not for any calculations.
         """
     )
     return
 
 
 @app.cell
-def p_1(N_FFT, SAMPLE_RATE, d_HOP_LENGTH, librosa, np, plt, torch):
+def _(PitchDetector):
+    detector = PitchDetector()
+    return (detector,)
+
+
+@app.cell
+def p_1(detector, librosa, np, plt, torch):
     def plot_waveform(waveform, SAMPLE_RATE):
         waveform = waveform.numpy()
 
@@ -61,7 +82,10 @@ def p_1(N_FFT, SAMPLE_RATE, d_HOP_LENGTH, librosa, np, plt, torch):
     def plot_with_title(x, title):
         num_frames = len(x)
         end_time = librosa.frames_to_time(
-            num_frames, sr=SAMPLE_RATE, hop_length=d_HOP_LENGTH, n_fft=N_FFT
+            num_frames,
+            sr=detector.sample_rate,
+            hop_length=detector.hop_length,
+            n_fft=detector.n_fft,
         )
         time_axis = (np.arange(0, num_frames) / num_frames) * end_time
         figure, axis = plt.subplots(1, 1)
@@ -70,53 +94,40 @@ def p_1(N_FFT, SAMPLE_RATE, d_HOP_LENGTH, librosa, np, plt, torch):
         figure.suptitle(title)
 
         return figure
-    return plot_waveform, plot_with_title
 
 
-@app.cell
-def _(np):
-    def inverse_sqrt(idx):
-        return 1 / np.sqrt(idx)
-    return (inverse_sqrt,)
+    def plot_with_dual_y(x1, x2, label1, label2, title):
+        num_frames1 = len(x1)
+        end_time1 = librosa.frames_to_time(
+            num_frames1,
+            sr=detector.sample_rate,
+            hop_length=detector.hop_length,
+            n_fft=detector.n_fft,
+        )
+        time_axis1 = (np.arange(0, num_frames1) / num_frames1) * end_time1
 
+        num_frames2 = len(x2)
+        end_time2 = librosa.frames_to_time(
+            num_frames2,
+            sr=detector.sample_rate,
+            hop_length=detector.hop_length,
+            n_fft=detector.n_fft,
+        )
+        time_axis2 = (np.arange(0, num_frames2) / num_frames2) * end_time2
 
-@app.cell
-def _(Path):
-    SAMPLE_WAV = Path(
-        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
-    )
-    return (SAMPLE_WAV,)
+        figure, axis1 = plt.subplots(1, 1)
+        axis1.plot(time_axis1, x1, "g-", label=label1, linewidth=1)
+        axis1.set_ylabel(label1)
 
+        axis2 = axis1.twinx()
+        axis2.plot(time_axis2, x2, "b-", label=label2, linewidth=1)
+        axis2.set_ylabel(label2)
 
-@app.cell
-def _(inverse_sqrt):
-    SAMPLE_RATE = 48000
-    N_FFT = 2048
-    OVERLAP_RATIO = 4
+        axis1.grid(True)
+        figure.suptitle(title)
 
-    SPECTROGRAM_POWER = 1.0
-    WIN_NAME = "triangle"  # "hann" "hamming" "triangle"
-    SPECTROGRAM_NORMALIZATION = False  # "window" or "frame_length" or False
-
-    LOWEST_MIDI_NOTE = 60
-    HIGHEST_MIDI_NOTE = 96
-    N_OVERTONES = 20
-    OVERTONE_SCALING = inverse_sqrt
-
-    CENTS_RESOLUTION = 10
-    return (
-        CENTS_RESOLUTION,
-        HIGHEST_MIDI_NOTE,
-        LOWEST_MIDI_NOTE,
-        N_FFT,
-        N_OVERTONES,
-        OVERLAP_RATIO,
-        OVERTONE_SCALING,
-        SAMPLE_RATE,
-        SPECTROGRAM_NORMALIZATION,
-        SPECTROGRAM_POWER,
-        WIN_NAME,
-    )
+        return figure
+    return plot_waveform, plot_with_dual_y, plot_with_title
 
 
 @app.cell
@@ -128,168 +139,58 @@ def _(mo):
 
 
 @app.cell
-def _(
-    CENTS_RESOLUTION,
-    N_FFT,
-    OVERLAP_RATIO,
-    SAMPLE_RATE,
-    SAMPLE_WAV,
-    WIN_NAME,
-    librosa,
-    offset,
-    torch,
-):
-    waveform, _ = librosa.load(SAMPLE_WAV, sr=SAMPLE_RATE, mono=False)
+def _(Audio, Path, detector, librosa, mo, offset, torch):
+    SAMPLE_WAV = Path(
+        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
+    )
+    waveform, _ = librosa.load(SAMPLE_WAV, sr=detector.sample_rate, mono=False)
     waveform = waveform[
         :,
-        int(offset.value * SAMPLE_RATE) : int((offset.value + 10.0) * SAMPLE_RATE),
+        int(offset.value * detector.sample_rate) : int(
+            (offset.value + 10.0) * detector.sample_rate
+        ),
     ]
     waveform = torch.from_numpy(waveform)
 
-    d_WIN_LENGTH = N_FFT
-    d_HOP_LENGTH = N_FFT // OVERLAP_RATIO
-    d_WINDOW = librosa.filters.get_window(WIN_NAME, d_WIN_LENGTH)
-    d_FFT_FREQS = librosa.fft_frequencies(sr=SAMPLE_RATE, n_fft=N_FFT)
-    d_CENTS_FACTOR = 100 // CENTS_RESOLUTION
-    return (
-        d_CENTS_FACTOR,
-        d_FFT_FREQS,
-        d_HOP_LENGTH,
-        d_WINDOW,
-        d_WIN_LENGTH,
-        waveform,
+    mo.vstack(
+        items=[
+            Audio(data=waveform, rate=detector.sample_rate),
+        ]
     )
+    return SAMPLE_WAV, waveform
 
 
 @app.cell
-def _(Audio, SAMPLE_RATE, mo, np, plot_waveform, plt, spectrogram, waveform):
+def _(detector, mo, plot_with_dual_y, plot_with_title, plt, waveform):
+    pitch, confidence, amplitude = detector.detect_pitch(waveform[0])
+
+    # Mask amplitude with confidence
+    min_confidence = 0.025
+    amplitude[confidence <= min_confidence] = 0.0
+
+
     mo.vstack(
         items=[
-            mo.md("## Wave File"),
+            plt.matshow(detector.factors),
             mo.hstack(
                 items=[
-                    mo.vstack(
-                        items=[
-                            plot_waveform(waveform, SAMPLE_RATE),
-                            Audio(data=waveform, rate=SAMPLE_RATE),
-                        ]
+                    plot_with_dual_y(
+                        pitch,
+                        amplitude,
+                        "Pitch",
+                        "Amplitude",
+                        "Pitches and Amplitudes",
                     ),
-                    plt.matshow(
-                        np.log(1e-8 + spectrogram.flip(0).numpy()),
-                        cmap="viridis",
-                    ),
+                    plot_with_title(confidence, "Confidence"),
                 ]
             ),
         ]
     )
-    return
+    return amplitude, confidence, min_confidence, pitch
 
 
 @app.cell
-def _(
-    HIGHEST_MIDI_NOTE,
-    LOWEST_MIDI_NOTE,
-    N_FFT,
-    N_OVERTONES,
-    OVERTONE_SCALING,
-    SAMPLE_RATE,
-    SPECTROGRAM_NORMALIZATION,
-    SPECTROGRAM_POWER,
-    d_CENTS_FACTOR,
-    d_FFT_FREQS,
-    d_HOP_LENGTH,
-    d_WINDOW,
-    d_WIN_LENGTH,
-    librosa,
-    np,
-    torch,
-    torchaudio,
-    waveform,
-):
-    def pure_sine_bin(hz, amp=1.0):
-        time = np.arange(N_FFT) / SAMPLE_RATE
-        # TODO: adding random phase seems to improve the situation
-        # wave = amp * np.sin(2 * np.pi * hz * time + np.random.uniform(-np.pi, np.pi, 1)[0])
-        wave = amp * np.sin(2 * np.pi * hz * time)
-
-        peak = torchaudio.functional.spectrogram(
-            waveform=torch.from_numpy(wave).unsqueeze(0),
-            pad=0,
-            window=torch.from_numpy(d_WINDOW),
-            n_fft=N_FFT,
-            hop_length=d_HOP_LENGTH,
-            win_length=d_WIN_LENGTH,
-            power=SPECTROGRAM_POWER,
-            normalized=SPECTROGRAM_NORMALIZATION,
-            center=False,
-        )
-
-        return peak[0, :, 0].numpy()
-
-
-    def harmonics(hz, n=20):
-        result = np.zeros_like(d_FFT_FREQS)
-        for idx in range(1, n + 1):
-            result += pure_sine_bin(hz * idx, OVERTONE_SCALING(idx))
-        return result
-
-
-    factors = np.stack(
-        [
-            harmonics(librosa.midi_to_hz(n / d_CENTS_FACTOR), n=N_OVERTONES)
-            for n in range(
-                LOWEST_MIDI_NOTE * d_CENTS_FACTOR,
-                HIGHEST_MIDI_NOTE * d_CENTS_FACTOR + 1,
-            )
-        ]
-    )
-
-    spectrogram = torchaudio.functional.spectrogram(
-        waveform=waveform[0],
-        pad=0,
-        window=torch.from_numpy(d_WINDOW),
-        n_fft=N_FFT,
-        hop_length=d_HOP_LENGTH,
-        win_length=d_WIN_LENGTH,
-        power=SPECTROGRAM_POWER,
-        normalized=SPECTROGRAM_NORMALIZATION,
-        center=True,
-    )
-
-    result = factors @ spectrogram.numpy()
-    pitch = np.argmax(result, axis=0) / d_CENTS_FACTOR + LOWEST_MIDI_NOTE
-    confidence = np.max(result, axis=0) / spectrogram.sum(dim=0).numpy() / N_FFT
-    amplitude = spectrogram.sum(dim=0) / N_FFT
-
-    # Mask amplitude with confidence
-    min_confidence = 0.05
-    amplitude[confidence <= min_confidence] = 0.0
-    return (
-        amplitude,
-        confidence,
-        factors,
-        harmonics,
-        min_confidence,
-        pitch,
-        pure_sine_bin,
-        result,
-        spectrogram,
-    )
-
-
-@app.cell
-def _(confidence, mo, pitch, plot_with_title):
-    mo.hstack(
-        items=[
-            plot_with_title(pitch, "Pitch"),
-            plot_with_title(confidence, "Confidence"),
-        ]
-    )
-    return
-
-
-@app.cell
-def _(SAMPLE_RATE, amplitude, interp1d, librosa, np, pitch, waveform):
+def _(amplitude, detector, interp1d, librosa, np, pitch, waveform):
     duration = 10.0
     t_audio = np.linspace(0, duration, waveform.shape[1], endpoint=False)
     t_control = np.linspace(0, duration, pitch.shape[0], endpoint=False)
@@ -297,7 +198,7 @@ def _(SAMPLE_RATE, amplitude, interp1d, librosa, np, pitch, waveform):
     # convert pitch information from midi, to cycles per second, to radians per sample
     cycles_per_second = librosa.midi_to_hz(pitch)
     radians_per_second = 2 * np.pi * cycles_per_second
-    radians_per_sample = radians_per_second / SAMPLE_RATE
+    radians_per_sample = radians_per_second / detector.sample_rate
 
     # Interpolate control frequencies to match the audio sample rate
     f_interp_radians_per_sample = interp1d(
@@ -332,8 +233,8 @@ def _(SAMPLE_RATE, amplitude, interp1d, librosa, np, pitch, waveform):
 
 
 @app.cell
-def _(Audio, SAMPLE_RATE, sine_wave):
-    Audio(data=sine_wave, rate=SAMPLE_RATE)
+def _(Audio, detector, sine_wave):
+    Audio(data=sine_wave, rate=detector.sample_rate)
     return
 
 
