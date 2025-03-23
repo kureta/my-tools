@@ -30,6 +30,7 @@ def _(mo):
         ⚠️ **Instead of making up a bell curve at a given frequency, use stft of a sine wave at that frequency with the same window that is used to generate the spectrogram of the target signal.**
 
         - [ ] If a pitch does not correspond exactly to an FFT bin it has to be normalized. We can normalize the area under the curve or we can redistribute the actual peaks value to the surrounding bins proportionally, and then normalize.
+        - [ ] Using stft at that frequency instead of the above method. But should revisit that.
         - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
         """
     )
@@ -73,6 +74,94 @@ def p_1(N_FFT, SAMPLE_RATE, d_HOP_LENGTH, librosa, np, plt, torch):
 
 
 @app.cell
+def _(np):
+    def inverse_sqrt(idx):
+        return 1 / np.sqrt(idx)
+    return (inverse_sqrt,)
+
+
+@app.cell
+def _(Path):
+    SAMPLE_WAV = Path(
+        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
+    )
+    return (SAMPLE_WAV,)
+
+
+@app.cell
+def _(inverse_sqrt):
+    SAMPLE_RATE = 48000
+    N_FFT = 2048
+    OVERLAP_RATIO = 4
+
+    SPECTROGRAM_POWER = 1.0
+    WIN_NAME = "triangle"  # "hann" "hamming" "triangle"
+    SPECTROGRAM_NORMALIZATION = False  # "window" or "frame_length" or False
+
+    LOWEST_MIDI_NOTE = 60
+    HIGHEST_MIDI_NOTE = 96
+    N_OVERTONES = 20
+    OVERTONE_SCALING = inverse_sqrt
+
+    CENTS_RESOLUTION = 10
+    return (
+        CENTS_RESOLUTION,
+        HIGHEST_MIDI_NOTE,
+        LOWEST_MIDI_NOTE,
+        N_FFT,
+        N_OVERTONES,
+        OVERLAP_RATIO,
+        OVERTONE_SCALING,
+        SAMPLE_RATE,
+        SPECTROGRAM_NORMALIZATION,
+        SPECTROGRAM_POWER,
+        WIN_NAME,
+    )
+
+
+@app.cell
+def _(mo):
+    offset = mo.ui.slider(0.0, 60.0, 0.5, label="Start offset in seconds.")
+
+    offset
+    return (offset,)
+
+
+@app.cell
+def _(
+    CENTS_RESOLUTION,
+    N_FFT,
+    OVERLAP_RATIO,
+    SAMPLE_RATE,
+    SAMPLE_WAV,
+    WIN_NAME,
+    librosa,
+    offset,
+    torch,
+):
+    waveform, _ = librosa.load(SAMPLE_WAV, sr=SAMPLE_RATE, mono=False)
+    waveform = waveform[
+        :,
+        int(offset.value * SAMPLE_RATE) : int((offset.value + 10.0) * SAMPLE_RATE),
+    ]
+    waveform = torch.from_numpy(waveform)
+
+    d_WIN_LENGTH = N_FFT
+    d_HOP_LENGTH = N_FFT // OVERLAP_RATIO
+    d_WINDOW = librosa.filters.get_window(WIN_NAME, d_WIN_LENGTH)
+    d_FFT_FREQS = librosa.fft_frequencies(sr=SAMPLE_RATE, n_fft=N_FFT)
+    d_CENTS_FACTOR = 100 // CENTS_RESOLUTION
+    return (
+        d_CENTS_FACTOR,
+        d_FFT_FREQS,
+        d_HOP_LENGTH,
+        d_WINDOW,
+        d_WIN_LENGTH,
+        waveform,
+    )
+
+
+@app.cell
 def _(Audio, SAMPLE_RATE, mo, np, plot_waveform, plt, spectrogram, waveform):
     mo.vstack(
         items=[
@@ -94,84 +183,6 @@ def _(Audio, SAMPLE_RATE, mo, np, plot_waveform, plt, spectrogram, waveform):
         ]
     )
     return
-
-
-@app.cell
-def _(Path, np):
-    SAMPLE_WAV = Path(
-        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
-    )
-
-    N_FFT = 2048
-    OVERLAP_RATIO = 4
-
-    SPECTROGRAM_POWER = 1.0
-    WIN_NAME = "hamming"  # "hann" "hamming" "triangle"
-    SPECTROGRAM_NORMALIZATION = False  # "window" or "frame_length" or False
-
-    LOWEST_MIDI_NOTE = 60
-    HIGHEST_MIDI_NOTE = 96
-    N_OVERTONES = 20
-
-    CENTS_RESOLUTION = 5
-
-
-    def OVERTONE_SCALING(idx):
-        return 1 / np.sqrt(idx)
-    return (
-        CENTS_RESOLUTION,
-        HIGHEST_MIDI_NOTE,
-        LOWEST_MIDI_NOTE,
-        N_FFT,
-        N_OVERTONES,
-        OVERLAP_RATIO,
-        OVERTONE_SCALING,
-        SAMPLE_WAV,
-        SPECTROGRAM_NORMALIZATION,
-        SPECTROGRAM_POWER,
-        WIN_NAME,
-    )
-
-
-@app.cell
-def _(mo):
-    offset = mo.ui.slider(0.0, 60.0, 0.5, label="Start offset in seconds.")
-
-    offset
-    return (offset,)
-
-
-@app.cell
-def _(
-    CENTS_RESOLUTION,
-    N_FFT,
-    OVERLAP_RATIO,
-    SAMPLE_WAV,
-    WIN_NAME,
-    librosa,
-    offset,
-    torchaudio,
-):
-    waveform, SAMPLE_RATE = torchaudio.load(SAMPLE_WAV)
-    waveform = waveform[
-        :,
-        int(offset.value * SAMPLE_RATE) : int((offset.value + 10.0) * SAMPLE_RATE),
-    ]
-
-    d_WIN_LENGTH = N_FFT
-    d_HOP_LENGTH = N_FFT // OVERLAP_RATIO
-    d_WINDOW = librosa.filters.get_window(WIN_NAME, d_WIN_LENGTH)
-    d_FFT_FREQS = librosa.fft_frequencies(sr=SAMPLE_RATE, n_fft=N_FFT)
-    d_CENTS_FACTOR = 100 // CENTS_RESOLUTION
-    return (
-        SAMPLE_RATE,
-        d_CENTS_FACTOR,
-        d_FFT_FREQS,
-        d_HOP_LENGTH,
-        d_WINDOW,
-        d_WIN_LENGTH,
-        waveform,
-    )
 
 
 @app.cell
