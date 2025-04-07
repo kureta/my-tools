@@ -72,7 +72,7 @@ class PitchDetector:
         lowest_midi_note=60,
         highest_midi_note=96,
         cents_resolution=10,
-        n_overtones=20,
+        n_overtones=100,
         fn_overtone_decay=OvertoneScaling.INVERSE_SQRT,
     ) -> None:
         # User defined parameters
@@ -121,12 +121,13 @@ class PitchDetector:
 
         result = self.factors @ spectrogram.numpy()
         pitch = np.argmax(result, axis=0) / self.cents_factor + self.lowest_midi_note
+        # TODO: division by zero
         confidence = (
             np.max(result, axis=0) / spectrogram.sum(dim=0).numpy() / self.n_fft
         )
         amplitude = spectrogram.sum(dim=0) / self.n_fft
 
-        return pitch, confidence, amplitude
+        return pitch, confidence, amplitude, result
 
     def _pure_sine_bin(self, hz, amp=1.0):
         time = np.arange(self.n_fft) / self.sample_rate

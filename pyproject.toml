@@ -6,7 +6,6 @@ readme = "README.md"
 authors = [{ name = "kureta", email = "skureta@gmail.com" }]
 requires-python = ">=3.9"
 dependencies = [
-  "ipython>=8.18.1",
   "librosa>=0.11.0",
   "marimo>=0.11.21",
   "matplotlib>=3.9.4",

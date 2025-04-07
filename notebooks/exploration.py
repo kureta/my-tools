@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.11.21"
+__generated_with = "0.12.4"
 app = marimo.App(width="medium")
 
 
@@ -9,7 +9,6 @@ def _():
     from pathlib import Path
 
     import marimo as mo
-    from IPython.display import Audio
     import torch
     import torchaudio
     import matplotlib.pyplot as plt
@@ -21,7 +20,6 @@ def _():
 
     mo.md("# Pitch detection")
     return (
-        Audio,
         Path,
         PitchDetector,
         interp1d,
@@ -47,19 +45,14 @@ def _(mo):
         - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
         - [ ] Refactor synthesizer into its own class
         - [ ] Implement everything in torch/torchaudio and ditch numpy. numpy can only be used during initialization, not for any calculations.
+        - [ ] Also, try to get rid of `librosa`. Its `llvmlite` dependency prevents us from using a newer version of python.
         """
     )
     return
 
 
 @app.cell
-def _(PitchDetector):
-    detector = PitchDetector()
-    return (detector,)
-
-
-@app.cell
-def p_1(detector, librosa, np, plt, torch):
+def _(detector, librosa, np, plt, torch):
     def plot_waveform(waveform, SAMPLE_RATE):
         waveform = waveform.numpy()
 
@@ -131,6 +124,12 @@ def p_1(detector, librosa, np, plt, torch):
 
 
 @app.cell
+def _(PitchDetector):
+    detector = PitchDetector()
+    return (detector,)
+
+
+@app.cell
 def _(mo):
     offset = mo.ui.slider(0.0, 60.0, 0.5, label="Start offset in seconds.")
 
@@ -139,7 +138,7 @@ def _(mo):
 
 
 @app.cell
-def _(Audio, Path, detector, librosa, mo, offset, torch):
+def _(Path, detector, librosa, mo, offset, torch):
     SAMPLE_WAV = Path(
         "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
     )
@@ -154,43 +153,25 @@ def _(Audio, Path, detector, librosa, mo, offset, torch):
 
     mo.vstack(
         items=[
-            Audio(data=waveform, rate=detector.sample_rate),
+            # Audio(data=waveform, rate=detector.sample_rate),
+            mo.audio(
+                src=waveform.numpy(), rate=detector.sample_rate, normalize=True
+            ),
         ]
     )
     return SAMPLE_WAV, waveform
 
 
 @app.cell
-def _(detector, mo, plot_with_dual_y, plot_with_title, plt, waveform):
-    pitch, confidence, amplitude = detector.detect_pitch(waveform[0])
+def _(detector, interp1d, librosa, np, waveform):
+    # ANALYZE
+    pitch, confidence, amplitude, result = detector.detect_pitch(waveform[0])
 
     # Mask amplitude with confidence
     min_confidence = 0.025
     amplitude[confidence <= min_confidence] = 0.0
 
-
-    mo.vstack(
-        items=[
-            plt.matshow(detector.factors),
-            mo.hstack(
-                items=[
-                    plot_with_dual_y(
-                        pitch,
-                        amplitude,
-                        "Pitch",
-                        "Amplitude",
-                        "Pitches and Amplitudes",
-                    ),
-                    plot_with_title(confidence, "Confidence"),
-                ]
-            ),
-        ]
-    )
-    return amplitude, confidence, min_confidence, pitch
-
-
-@app.cell
-def _(amplitude, detector, interp1d, librosa, np, pitch, waveform):
+    # RESYNTHESIZE
     duration = 10.0
     t_audio = np.linspace(0, duration, waveform.shape[1], endpoint=False)
     t_control = np.linspace(0, duration, pitch.shape[0], endpoint=False)
@@ -217,15 +198,20 @@ def _(amplitude, detector, interp1d, librosa, np, pitch, waveform):
     # # Generate the sine wave
     sine_wave = audio_amps * np.sin(audio_phase)
     return (
+        amplitude,
         audio_amps,
         audio_phase,
         audio_radians_per_sample,
+        confidence,
         cycles_per_second,
         duration,
         f_interp_radians_per_sample,
         interp_amps,
+        min_confidence,
+        pitch,
         radians_per_sample,
         radians_per_second,
+        result,
         sine_wave,
         t_audio,
         t_control,
@@ -233,9 +219,46 @@ def _(amplitude, detector, interp1d, librosa, np, pitch, waveform):
 
 
 @app.cell
-def _(Audio, detector, sine_wave):
-    Audio(data=sine_wave, rate=detector.sample_rate)
-    return
+def _(
+    amplitude,
+    confidence,
+    detector,
+    mo,
+    pitch,
+    plot_with_dual_y,
+    plot_with_title,
+    plt,
+    result,
+    sine_wave,
+):
+    figure1, ax1 = plt.subplots(1, 1)
+    ax1.imshow(detector.factors.T, origin="lower")
+    figure2 = plot_with_dual_y(
+        pitch,
+        amplitude,
+        "Pitch",
+        "Amplitude",
+        "Pitches and Amplitudes",
+    )
+    figure3 = plot_with_title(confidence, "Confidence")
+    figure4, ax4 = plt.subplots(1, 1)
+    ax4.imshow(result, origin="lower")
+
+    mo.vstack(
+        items=[
+            figure1,
+            mo.hstack(items=[figure2, figure3]),
+            mo.hstack(
+                items=[
+                    figure4,
+                    mo.audio(
+                        src=sine_wave, rate=detector.sample_rate, normalize=True
+                    ),
+                ]
+            ),
+        ]
+    )
+    return ax1, ax4, figure1, figure2, figure3, figure4
 
 
 @app.cell
