@@ -1,12 +1,14 @@
+
+
 import marimo
 
-__generated_with = "0.12.4"
+__generated_with = "0.13.0"
 app = marimo.App(width="medium")
 
 
-@app.cell
-def _():
-    from pathlib import Path
+app._unparsable_cell(
+    r"""
+    n_overtonesfrom pathlib import Path
 
     import marimo as mo
     import torch
@@ -16,20 +18,12 @@ def _():
     import librosa
     from scipy.interpolate import interp1d
 
-    from my_tools.pitch_detector import PitchDetector
+    from my_tools import pitch_detector as pd
 
-    mo.md("# Pitch detection")
-    return (
-        Path,
-        PitchDetector,
-        interp1d,
-        librosa,
-        mo,
-        np,
-        plt,
-        torch,
-        torchaudio,
-    )
+    mo.md(\"# Pitch detection\")
+    """,
+    name="_"
+)
 
 
 @app.cell(hide_code=True)
@@ -120,30 +114,44 @@ def _(detector, librosa, np, plt, torch):
         figure.suptitle(title)
 
         return figure
-    return plot_waveform, plot_with_dual_y, plot_with_title
+    return plot_with_dual_y, plot_with_title
 
 
 @app.cell
-def _(PitchDetector):
-    detector = PitchDetector()
+def _(pd):
+    detector = pd.PitchDetector(
+        lowest_midi_note=35,
+        highest_midi_note=81,
+        spectrogram_window=pd.WindowType.HAMMING,
+    )
     return (detector,)
 
 
 @app.cell
-def _(mo):
-    offset = mo.ui.slider(0.0, 60.0, 0.5, label="Start offset in seconds.")
+def _(Path, detector, librosa):
+    SAMPLE_WAV = Path("/home/kureta/Music/Cello Samples/BachSaSu1-00021-.wav")
+    uncut_waveform, _ = librosa.load(
+        SAMPLE_WAV, sr=detector.sample_rate, mono=False
+    )
+    return (uncut_waveform,)
+
+
+@app.cell
+def _(detector, mo, uncut_waveform):
+    offset = mo.ui.slider(
+        0.0,
+        len(uncut_waveform[0]) / detector.sample_rate - 10.0,
+        0.5,
+        label="Start offset in seconds.",
+    )
 
     offset
     return (offset,)
 
 
 @app.cell
-def _(Path, detector, librosa, mo, offset, torch):
-    SAMPLE_WAV = Path(
-        "/home/kureta/Music/Flute Samples/14. 3 Oriental Pieces_ I. Bergere captive.wav"
-    )
-    waveform, _ = librosa.load(SAMPLE_WAV, sr=detector.sample_rate, mono=False)
-    waveform = waveform[
+def _(detector, mo, offset, torch, uncut_waveform):
+    waveform = uncut_waveform[
         :,
         int(offset.value * detector.sample_rate) : int(
             (offset.value + 10.0) * detector.sample_rate
@@ -159,7 +167,7 @@ def _(Path, detector, librosa, mo, offset, torch):
             ),
         ]
     )
-    return SAMPLE_WAV, waveform
+    return (waveform,)
 
 
 @app.cell
@@ -197,25 +205,7 @@ def _(detector, interp1d, librosa, np, waveform):
 
     # # Generate the sine wave
     sine_wave = audio_amps * np.sin(audio_phase)
-    return (
-        amplitude,
-        audio_amps,
-        audio_phase,
-        audio_radians_per_sample,
-        confidence,
-        cycles_per_second,
-        duration,
-        f_interp_radians_per_sample,
-        interp_amps,
-        min_confidence,
-        pitch,
-        radians_per_sample,
-        radians_per_second,
-        result,
-        sine_wave,
-        t_audio,
-        t_control,
-    )
+    return amplitude, confidence, pitch, result, sine_wave
 
 
 @app.cell
@@ -258,7 +248,7 @@ def _(
             ),
         ]
     )
-    return ax1, ax4, figure1, figure2, figure3, figure4
+    return
 
 
 @app.cell
