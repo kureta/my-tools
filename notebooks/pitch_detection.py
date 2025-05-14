@@ -8,7 +8,7 @@ app = marimo.App(width="medium")
 
 app._unparsable_cell(
     r"""
-    n_overtonesfrom pathlib import Path
+    from pathlib import Path
 
     import marimo as mo
     import torch
