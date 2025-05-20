@@ -145,7 +145,7 @@ class PitchDetector:
         time = np.arange(self.n_fft) / self.sample_rate
         # TODO: adding random phase seems to improve the situation
         # wave = amp * np.sin(2 * np.pi * hz * time + np.random.uniform(-np.pi, np.pi, 1)[0])
-        wave = amp * np.sin(2 * np.pi * hz * time)
+        wave = amp * np.sin(2 * np.pi * hz * time + np.pi)
 
         peak = torchaudio.functional.spectrogram(
             waveform=torch.from_numpy(wave).unsqueeze(0),

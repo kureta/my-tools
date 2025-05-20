@@ -132,7 +132,9 @@ def _(pd):
 @app.cell
 def _(Path, detector, librosa):
     # SAMPLE_WAV = Path("/home/kureta/Music/Flute Samples/03. Sonata Appassionata, Op. 140.wav")
-    SAMPLE_WAV = Path("/home/kureta/Music/Cello Samples/Romberg38-00021-.wav")
+    SAMPLE_WAV = Path(
+        "/home/kureta/Music/Cello Samples/Romberg38-00026-.wav"
+    )  # 18, 23, 25, 26, 27, 28
     # SAMPLE_WAV = Path("/home/kureta/Music/haiku.wav")
 
     uncut_waveform, _ = librosa.load(
@@ -159,7 +161,7 @@ def _(detector, mo, np, torch, uncut_waveform):
 
 @app.cell
 def _():
-    min_confidence = 3.7e-3
+    min_confidence = 3.77e-3
     return (min_confidence,)
 
 
