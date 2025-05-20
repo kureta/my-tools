@@ -1,3 +1,5 @@
+# pyright: basic
+
 from enum import Enum
 
 import librosa
@@ -19,6 +21,7 @@ class SpectrogramNormalization(Enum):
 
 
 class SampleRate(Enum):
+    SR_8192 = 8192
     SR_44100 = 44100
     SR_48000 = 48000
     SR_88200 = 88200
@@ -80,7 +83,8 @@ class PitchDetector:
         self.n_fft = n_fft.value
         self.hop_ratio = hop_ratio.value
         self.spectrogram_power = spectrogram_power.value
-        self.spectrogram_window = FFTWindow(spectrogram_window.value, n_fft.value)
+        self.spectrogram_window = FFTWindow(
+            spectrogram_window.value, n_fft.value)
         self.spectrogram_normalization = spectrogram_normalization.value
         self.lowest_midi_note = lowest_midi_note
         self.highest_midi_note = highest_midi_note
@@ -90,7 +94,8 @@ class PitchDetector:
 
         # Derived/calculated parameters
         self.hop_length = self.n_fft // self.hop_ratio
-        self.fft_freqs = librosa.fft_frequencies(sr=self.sample_rate, n_fft=self.n_fft)
+        self.fft_freqs = librosa.fft_frequencies(
+            sr=self.sample_rate, n_fft=self.n_fft)
         self.cents_factor = 100 // self.cents_resolution
 
         # Calculate overtone matrix
@@ -120,12 +125,19 @@ class PitchDetector:
         )
 
         result = self.factors @ spectrogram.numpy()
-        pitch = np.argmax(result, axis=0) / self.cents_factor + self.lowest_midi_note
-        # TODO: division by zero
-        confidence = (
-            np.max(result, axis=0) / spectrogram.sum(dim=0).numpy() / self.n_fft
-        )
+        pitch = np.argmax(result, axis=0) / \
+            self.cents_factor + self.lowest_midi_note
         amplitude = spectrogram.sum(dim=0) / self.n_fft
+
+        # TODO: division by zero
+        # confidence = (
+        #     np.max(result, axis=0) /
+        #     self.factors[np.argmax(result, axis=0)].sum()
+        # )
+        confidence = (
+            np.max(result, axis=0) /
+            np.sum(result, axis=0)
+        )
 
         return pitch, confidence, amplitude, result
 
@@ -154,5 +166,6 @@ class PitchDetector:
         for idx in range(1, n + 1):
             if (hz * idx) > self.sample_rate // 2:
                 break
-            result += self._pure_sine_bin(hz * idx, self.fn_overtone_decay(idx))
+            result += self._pure_sine_bin(hz * idx,
+                                          self.fn_overtone_decay(idx))
         return result

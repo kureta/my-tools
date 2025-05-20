@@ -1,13 +1,11 @@
-
-
 import marimo
 
-__generated_with = "0.13.0"
+__generated_with = "0.13.8"
 app = marimo.App(width="medium")
 
 
-app._unparsable_cell(
-    r"""
+@app.cell
+def _():
     from pathlib import Path
 
     import marimo as mo
@@ -18,34 +16,36 @@ app._unparsable_cell(
     import librosa
     from scipy.interpolate import interp1d
 
-    from my_tools import pitch_detector as pd
+    mo.md("# Pitch detection")
+    return Path, interp1d, librosa, mo, np, plt, torch
 
-    mo.md(\"# Pitch detection\")
-    """,
-    name="_"
-)
+
+@app.cell
+def _():
+    from my_tools import pitch_detector as pd
+    return (pd,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(
         """
-        ## Some TODOS
+    ## Some TODOS
 
-        ⚠️ **Instead of making up a bell curve at a given frequency, use stft of a sine wave at that frequency with the same window that is used to generate the spectrogram of the target signal.**
+    ⚠️ **Instead of making up a bell curve at a given frequency, use stft of a sine wave at that frequency with the same window that is used to generate the spectrogram of the target signal.**
 
-        - [ ] If a pitch does not correspond exactly to an FFT bin it has to be normalized. We can normalize the area under the curve or we can redistribute the actual peaks value to the surrounding bins proportionally, and then normalize.
-        - [ ] Using stft at that frequency instead of the above method. But should revisit that.
-        - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
-        - [ ] Refactor synthesizer into its own class
-        - [ ] Implement everything in torch/torchaudio and ditch numpy. numpy can only be used during initialization, not for any calculations.
-        - [ ] Also, try to get rid of `librosa`. Its `llvmlite` dependency prevents us from using a newer version of python.
-        """
+    - [ ] If a pitch does not correspond exactly to an FFT bin it has to be normalized. We can normalize the area under the curve or we can redistribute the actual peaks value to the surrounding bins proportionally, and then normalize.
+    - [ ] Using stft at that frequency instead of the above method. But should revisit that.
+    - [ ] We are currently decaying the amplitudes of overtones by the squareroot of their index. This can be further investigated.
+    - [ ] Refactor synthesizer into its own class
+    - [ ] Implement everything in torch/torchaudio and ditch numpy. numpy can only be used during initialization, not for any calculations.
+    - [ ] Also, try to get rid of `librosa`. Its `llvmlite` dependency prevents us from using a newer version of python.
+    """
     )
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(detector, librosa, np, plt, torch):
     def plot_waveform(waveform, SAMPLE_RATE):
         waveform = waveform.numpy()
@@ -120,43 +120,30 @@ def _(detector, librosa, np, plt, torch):
 @app.cell
 def _(pd):
     detector = pd.PitchDetector(
-        lowest_midi_note=35,
-        highest_midi_note=81,
+        lowest_midi_note=24,
+        highest_midi_note=87,
         spectrogram_window=pd.WindowType.HAMMING,
+        sample_rate=pd.SampleRate.SR_8192,
+        n_fft=pd.FFTSize.FFT_512,
     )
     return (detector,)
 
 
 @app.cell
 def _(Path, detector, librosa):
-    SAMPLE_WAV = Path("/home/kureta/Music/Cello Samples/BachSaSu1-00021-.wav")
+    # SAMPLE_WAV = Path("/home/kureta/Music/Flute Samples/03. Sonata Appassionata, Op. 140.wav")
+    SAMPLE_WAV = Path("/home/kureta/Music/Cello Samples/Romberg38-00021-.wav")
+    # SAMPLE_WAV = Path("/home/kureta/Music/haiku.wav")
+
     uncut_waveform, _ = librosa.load(
-        SAMPLE_WAV, sr=detector.sample_rate, mono=False
+        SAMPLE_WAV, sr=detector.sample_rate, mono=False, duration=10.0
     )
     return (uncut_waveform,)
 
 
-@app.cell
-def _(detector, mo, uncut_waveform):
-    offset = mo.ui.slider(
-        0.0,
-        len(uncut_waveform[0]) / detector.sample_rate - 10.0,
-        0.5,
-        label="Start offset in seconds.",
-    )
-
-    offset
-    return (offset,)
-
-
-@app.cell
-def _(detector, mo, offset, torch, uncut_waveform):
-    waveform = uncut_waveform[
-        :,
-        int(offset.value * detector.sample_rate) : int(
-            (offset.value + 10.0) * detector.sample_rate
-        ),
-    ]
+@app.cell(hide_code=True)
+def _(detector, mo, np, torch, uncut_waveform):
+    waveform = uncut_waveform / np.max(np.abs(uncut_waveform))
     waveform = torch.from_numpy(waveform)
 
     mo.vstack(
@@ -171,12 +158,17 @@ def _(detector, mo, offset, torch, uncut_waveform):
 
 
 @app.cell
-def _(detector, interp1d, librosa, np, waveform):
+def _():
+    min_confidence = 3.7e-3
+    return (min_confidence,)
+
+
+@app.cell(hide_code=True)
+def _(detector, interp1d, librosa, min_confidence, np, waveform):
     # ANALYZE
     pitch, confidence, amplitude, result = detector.detect_pitch(waveform[0])
 
     # Mask amplitude with confidence
-    min_confidence = 0.025
     amplitude[confidence <= min_confidence] = 0.0
 
     # RESYNTHESIZE
@@ -236,13 +228,15 @@ def _(
 
     mo.vstack(
         items=[
-            figure1,
+            # figure1,
             mo.hstack(items=[figure2, figure3]),
             mo.hstack(
                 items=[
-                    figure4,
+                    # figure4,
                     mo.audio(
-                        src=sine_wave, rate=detector.sample_rate, normalize=True
+                        src=sine_wave,
+                        rate=detector.sample_rate,
+                        normalize=True,
                     ),
                 ]
             ),
