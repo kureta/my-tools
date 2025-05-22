@@ -36,5 +36,6 @@ lsp = true
 [dependency-groups]
 dev = [
     "debugpy>=1.8.14",
+    "pynvim>=0.5.2",
     "watchdog>=6.0.0",
 ]

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.8"
+__generated_with = "0.13.11"
 app = marimo.App(width="medium")
 
 
@@ -15,10 +15,9 @@ def _():
     import numpy as np
     import librosa
     from scipy.interpolate import interp1d
-    from ssqueezepy import ssq_stft, ssq_cwt
 
     mo.md("# Pitch detection")
-    return Path, interp1d, librosa, mo, np, plt, ssq_cwt, ssq_stft, torch
+    return Path, interp1d, librosa, mo, np, plt, torch
 
 
 @app.cell
@@ -144,12 +143,12 @@ def _(pd):
 def _(Path, detector, librosa):
     # SAMPLE_WAV = Path("/home/kureta/Music/Flute Samples/03. Sonata Appassionata, Op. 140.wav")
     SAMPLE_WAV = Path(
-        "/home/kureta/Music/Cello Samples/Romberg38-00026-.wav"
+        "/home/kureta/Music/Violin Samples/yee_brahms#9.wav"
     )  # 18, 23, 25, 26, 27, 28
     # SAMPLE_WAV = Path("/home/kureta/Music/haiku.wav")
 
     uncut_waveform, _ = librosa.load(
-        SAMPLE_WAV, sr=detector.sample_rate, mono=True, duration=2.0
+        SAMPLE_WAV, sr=detector.sample_rate, mono=True, duration=10.0
     )
     return (uncut_waveform,)
 
@@ -168,60 +167,6 @@ def _(detector, mo, np, torch, uncut_waveform):
         ]
     )
     return (waveform,)
-
-
-@app.cell
-def _(np, plt):
-    def viz(x, Tx, Wx):
-        plt.imshow(np.abs(Wx), aspect="auto", cmap="turbo")
-        plt.show()
-        plt.imshow(np.abs(Tx), aspect="auto", vmin=0, vmax=0.2, cmap="turbo")
-        plt.show()
-    return
-
-
-@app.cell
-def _(detector, librosa, ssq_stft, waveform):
-    Tsxo, Sxo, *_ = ssq_stft(
-        waveform,
-        window=librosa.filters.get_window("hann", 512),
-        n_fft=detector.n_fft,
-        hop_len=detector.hop_length,
-        fs=detector.sample_rate,
-    )
-    return Sxo, Tsxo
-
-
-@app.cell
-def _(Sxo, Tsxo, np, plt):
-    figure7, (axis1, axis2) = plt.subplots(2, 1)
-    axis1.imshow(np.flipud(np.abs(Sxo)), aspect="auto")
-    axis2.imshow(np.flipud(np.abs(Tsxo)), aspect="auto")
-
-    figure7
-    return
-
-
-@app.cell
-def _(Tsxo, np):
-    np.abs(Tsxo)[20:25, 60]
-    return
-
-
-@app.cell
-def _(ssq_cwt, waveform):
-    Twxo, Wxo, *_ = ssq_cwt(waveform, scales="linear")
-    return Twxo, Wxo
-
-
-@app.cell
-def _(Twxo, Wxo, np, plt):
-    figure8, (axis18, axis28) = plt.subplots(2, 1)
-    axis18.imshow(np.abs(Wxo), aspect="auto", cmap="turbo")
-    axis28.imshow(np.abs(Twxo), aspect="auto", cmap="turbo")
-
-    figure8
-    return
 
 
 @app.cell
