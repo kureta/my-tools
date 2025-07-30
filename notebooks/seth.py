@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.11"
+__generated_with = "0.14.15"
 app = marimo.App(width="medium")
 
 
@@ -201,12 +201,6 @@ def _(dissonance, np):
     f1 = base_freq
     f2 = base_freq * 2 ** (1 / 12)
 
-    np.sum(dissonance(f1 * harmonics, f2 * harmonics, amps, amps))
-    return amps, f1, f2, harmonics
-
-
-@app.cell
-def _(amps, dissonance, f1, f2, harmonics, np):
     spec1 = f1 * harmonics
     spec2 = f2 * harmonics
 
