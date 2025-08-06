@@ -12,7 +12,9 @@ def _():
     import numpy as np
     import numba as nb
     from scipy.signal import find_peaks
-    return find_peaks, mo, nb, np, plt
+
+    import librosa
+    return find_peaks, librosa, mo, nb, np, plt
 
 
 @app.cell
@@ -71,18 +73,49 @@ def _(np):
 
 
 @app.cell
-def _(dissmeasure, find_peaks, np, plt):
+def _(librosa, mo):
+    tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
+    sr = 44100
+    tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
+
+    mo.audio(tamtam, sr, normalize=False)
+    return sr, tamtam
+
+
+@app.cell
+def _(find_peaks, np, plt, sr, tamtam):
+    tamtam_spectrum = np.abs(np.fft.rfft(tamtam))
+    spec_freqs = np.fft.rfftfreq(tamtam.shape[0]) * sr
+
+    filtered_freqs_idx = spec_freqs <= 5000
+    fs = spec_freqs[filtered_freqs_idx]
+    mags = tamtam_spectrum[filtered_freqs_idx]
+    mags /= mags.max()
+
+    tamtam_peaks, _ = find_peaks(mags, prominence=0.05)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(fs, mags)
+    plt.plot(fs[tamtam_peaks], mags[tamtam_peaks], "ro", label="minima")
+    plt.gca()
+    return fs, mags, tamtam_peaks
+
+
+@app.cell
+def _(dissmeasure, find_peaks, fs, mags, np, plt, tamtam_peaks):
     n_harm = 21
-    freq1 = 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
+    freq1 = fs[tamtam_peaks]  # 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
+    amp1 = mags[tamtam_peaks]
     freq2 = 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
-    amp = 0.88 ** np.array(range(0, n_harm))
-    r_low = 1
-    alpharange = 2.1
+    amp2 = 0.88 ** np.array(range(0, n_harm))
+    # amp2 = 1 / np.array(range(1, n_harm + 1))
+    r_low = 1.0
+    alpharange = 4.1
     method = "min"
 
     n = 3000
     diss = np.empty(n)
-    a = np.concatenate((amp, amp))
+    a = np.concatenate((amp1, amp2))
     for i, alpha in enumerate(np.linspace(r_low, alpharange, n)):
         f = np.concatenate((freq1, alpha * freq2))
         d = dissmeasure(f, a, method)
@@ -90,7 +123,7 @@ def _(dissmeasure, find_peaks, np, plt):
 
     # 2) find local minima: a point i is a local minimum if y[i-1] > y[i] < y[i+1]
     #    so we look for sign changes in the discrete derivative
-    peaks, props = find_peaks(-diss, prominence=0.1)
+    peaks, props = find_peaks(-diss, prominence=0.05)
 
     x = np.linspace(r_low, alpharange, len(diss))
 
@@ -115,7 +148,19 @@ def _(dissmeasure, find_peaks, np, plt):
 
     plt.tight_layout()
     plt.gca()
-    return (method,)
+    return method, peaks, x
+
+
+@app.cell
+def _(fs, librosa, peaks, tamtam_peaks, x):
+    print(librosa.hz_to_midi(fs[tamtam_peaks][0]))
+    print()
+
+    for ratio in x[peaks]:
+        hz = fs[tamtam_peaks][0] * ratio
+        midi = librosa.hz_to_midi(hz) - librosa.hz_to_midi(fs[tamtam_peaks][0])
+        print(midi)
+    return
 
 
 @app.function
@@ -157,6 +202,13 @@ def _():
 def _():
     # Pythagorian for 0.95
     print(generate_scale(667, 1140, 12))
+    return
+
+
+@app.cell
+def _():
+    # Tamtam
+    print(generate_scale(291, 1207, 12))
     return
 
 
