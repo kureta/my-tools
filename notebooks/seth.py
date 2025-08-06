@@ -83,16 +83,50 @@ def _(librosa, mo):
 
 
 @app.cell
-def _(find_peaks, np, plt, sr, tamtam):
-    tamtam_spectrum = np.abs(np.fft.rfft(tamtam))
-    spec_freqs = np.fft.rfftfreq(tamtam.shape[0]) * sr
+def _(librosa, mo, sr):
+    cello_path = "/home/kureta/Music/IRCAM/orchideaSOL2020/_OrchideaSOL2020_release/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-C2-ff-4c-N.wav"
+    cello, _ = librosa.load(cello_path, mono=True, sr=sr)
 
-    filtered_freqs_idx = spec_freqs <= 5000
-    fs = spec_freqs[filtered_freqs_idx]
-    mags = tamtam_spectrum[filtered_freqs_idx]
-    mags /= mags.max()
+    mo.audio(cello, sr, normalize=False)
+    return (cello,)
 
-    tamtam_peaks, _ = find_peaks(mags, prominence=0.05)
+
+@app.cell
+def _(find_peaks, np, sr):
+    def get_overtones(audio, prominence=0.05):
+        spectrum = np.abs(np.fft.rfft(audio))
+        spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
+
+        filtered_freqs_idx = spec_freqs <= 2000
+        fs = spec_freqs[filtered_freqs_idx]
+        mags = spectrum[filtered_freqs_idx]
+        mags /= mags.max()
+
+        # TODOs
+        # Use Bark Scale to set the minimum distance between peaks
+        # convert amplitudes to perceptual loudness for dissonance curve calculation
+        peaks, _ = find_peaks(
+            mags, prominence=prominence, distance=50 / spec_freqs[1], height=0.01
+        )
+
+        return fs, mags, peaks
+    return (get_overtones,)
+
+
+@app.cell
+def _(cello, get_overtones, plt):
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(cello_fs, cello_mags)
+    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], "ro", label="minima")
+    plt.gca()
+    return cello_fs, cello_mags, cello_peaks
+
+
+@app.cell
+def _(get_overtones, plt, tamtam):
+    fs, mags, tamtam_peaks = get_overtones(tamtam, prominence=0.01)
 
     plt.figure(figsize=(12, 6))
     plt.plot(fs, mags)
@@ -102,12 +136,23 @@ def _(find_peaks, np, plt, sr, tamtam):
 
 
 @app.cell
-def _(dissmeasure, find_peaks, fs, mags, np, plt, tamtam_peaks):
+def _(
+    cello_fs,
+    cello_mags,
+    cello_peaks,
+    dissmeasure,
+    find_peaks,
+    fs,
+    mags,
+    np,
+    plt,
+    tamtam_peaks,
+):
     n_harm = 21
     freq1 = fs[tamtam_peaks]  # 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
     amp1 = mags[tamtam_peaks]
-    freq2 = 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
-    amp2 = 0.88 ** np.array(range(0, n_harm))
+    freq2 = cello_fs[cello_peaks]
+    amp2 = cello_mags[cello_peaks]
     # amp2 = 1 / np.array(range(1, n_harm + 1))
     r_low = 1.0
     alpharange = 4.1
@@ -149,6 +194,12 @@ def _(dissmeasure, find_peaks, fs, mags, np, plt, tamtam_peaks):
     plt.tight_layout()
     plt.gca()
     return method, peaks, x
+
+
+@app.cell
+def _(np, peaks, x):
+    [f"{int(np.round(t))}" for t in np.log2(x[peaks]) * 1200]
+    return
 
 
 @app.cell
