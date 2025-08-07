@@ -75,6 +75,7 @@ def _(np):
 @app.cell
 def _(librosa, mo):
     tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
+    # tamtam_path = "/home/kureta/Music/easy_thunder__thundergong1.flac"
     sr = 44100
     tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
 
@@ -97,7 +98,7 @@ def _(find_peaks, np, sr):
         spectrum = np.abs(np.fft.rfft(audio))
         spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
 
-        filtered_freqs_idx = spec_freqs <= 2000
+        filtered_freqs_idx = spec_freqs <= 4000
         fs = spec_freqs[filtered_freqs_idx]
         mags = spectrum[filtered_freqs_idx]
         mags /= mags.max()
@@ -148,12 +149,16 @@ def _(
     plt,
     tamtam_peaks,
 ):
-    n_harm = 21
-    freq1 = fs[tamtam_peaks]  # 261.63 * (np.array(range(1, n_harm + 1)) ** 1.05)
+    freq1 = fs[tamtam_peaks]
     amp1 = mags[tamtam_peaks]
-    freq2 = cello_fs[cello_peaks]
+    f0 = fs[tamtam_peaks][1]
+    freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
     amp2 = cello_mags[cello_peaks]
+
+    # n_harm = 21
+    # freq2 = f0 * (np.array(range(1, n_harm + 1)) ** 1.05)
     # amp2 = 1 / np.array(range(1, n_harm + 1))
+
     r_low = 1.0
     alpharange = 4.1
     method = "min"
@@ -204,7 +209,7 @@ def _(np, peaks, x):
 
 @app.cell
 def _(fs, librosa, peaks, tamtam_peaks, x):
-    print(librosa.hz_to_midi(fs[tamtam_peaks][0]))
+    print(librosa.hz_to_midi(fs[tamtam_peaks][1]))
     print()
 
     for ratio in x[peaks]:
