@@ -89,7 +89,7 @@ def _(librosa, mo, sr):
     cello, _ = librosa.load(cello_path, mono=True, sr=sr)
 
     mo.audio(cello, sr, normalize=False)
-    return (cello,)
+    return
 
 
 @app.cell
@@ -114,15 +114,17 @@ def _(find_peaks, np, sr):
     return (get_overtones,)
 
 
-@app.cell
-def _(cello, get_overtones, plt):
-    cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
+app._unparsable_cell(
+    r"""
+     cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
 
     plt.figure(figsize=(12, 6))
     plt.plot(cello_fs, cello_mags)
-    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], "ro", label="minima")
+    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], \"ro\", label=\"minima\")
     plt.gca()
-    return cello_fs, cello_mags, cello_peaks
+    """,
+    name="_"
+)
 
 
 @app.cell

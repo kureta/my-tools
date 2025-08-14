@@ -1,11 +1,10 @@
 # pyright: basic
 
+import typing
 from enum import Enum
 
 import librosa
 import numpy as np
-import torch
-import torchaudio
 
 
 class WindowType(Enum):
@@ -44,17 +43,15 @@ class SpectorgramPower(Enum):
     POW_2 = 2
 
 
-def inverse_sqrt(idx):
+OvertoneScaling = typing.Callable[[int], float]
+
+
+def inverse_sqrt(idx: int) -> float:
     return 1 / np.sqrt(idx)
 
 
-def inverse(idx):
+def inverse(idx: int) -> float:
     return 1 / idx
-
-
-class OvertoneScaling(Enum):
-    INVERSE = inverse
-    INVERSE_SQRT = inverse_sqrt
 
 
 class FFTWindow:
@@ -76,7 +73,7 @@ class PitchDetector:
         highest_midi_note=96,
         cents_resolution=10,
         n_overtones=100,
-        fn_overtone_decay=OvertoneScaling.INVERSE_SQRT,
+        fn_overtone_decay: OvertoneScaling = inverse_sqrt,
     ) -> None:
         # User defined parameters
         self.sample_rate = sample_rate.value
@@ -99,41 +96,24 @@ class PitchDetector:
         self.cents_factor = 100 // self.cents_resolution
 
         # Calculate overtone matrix
-        self.factors = np.stack(
-            [
-                self._harmonics(
-                    librosa.midi_to_hz(n / self.cents_factor), n=self.n_overtones
-                )
-                for n in range(
-                    self.lowest_midi_note * self.cents_factor,
-                    self.highest_midi_note * self.cents_factor + 1,
-                )
-            ]
-        )
+        self.factors = np.stack([
+            self._harmonics(
+                librosa.midi_to_hz(n / self.cents_factor), n=self.n_overtones
+            )
+            for n in range(
+                self.lowest_midi_note * self.cents_factor,
+                self.highest_midi_note * self.cents_factor + 1,
+            )
+        ])
 
     def detect_pitch(self, waveform):
-        spectrogram = torchaudio.functional.spectrogram(
-            waveform=waveform,
-            pad=0,
-            window=torch.from_numpy(self.spectrogram_window.window),
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.n_fft,
-            power=self.spectrogram_power,
-            normalized=self.spectrogram_normalization,
-            center=True,
-        )
+        spectrogram = self._spectrogram(waveform)
 
-        result = self.factors @ spectrogram.numpy()
+        result = self.factors @ spectrogram
         pitch = np.argmax(result, axis=0) / \
             self.cents_factor + self.lowest_midi_note
-        amplitude = spectrogram.sum(dim=0) / self.n_fft
+        amplitude = spectrogram.sum(axis=0) / self.n_fft
 
-        # TODO: division by zero
-        # confidence = (
-        #     np.max(result, axis=0) /
-        #     self.factors[np.argmax(result, axis=0)].sum()
-        # )
         confidence = (
             np.max(result, axis=0) /
             np.sum(result, axis=0)
@@ -144,22 +124,13 @@ class PitchDetector:
     def _pure_sine_bin(self, hz, amp=1.0):
         time = np.arange(self.n_fft) / self.sample_rate
         # TODO: adding random phase seems to improve the situation
-        # wave = amp * np.sin(2 * np.pi * hz * time + np.random.uniform(-np.pi, np.pi, 1)[0])
+        # random_phase = np.random.uniform(-np.pi, np.pi, 1)[0]
+        # wave = amp * np.sin(2 * np.pi * hz * time + random_phase)
         wave = amp * np.sin(2 * np.pi * hz * time + np.pi)
 
-        peak = torchaudio.functional.spectrogram(
-            waveform=torch.from_numpy(wave).unsqueeze(0),
-            pad=0,
-            window=torch.from_numpy(self.spectrogram_window.window),
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.n_fft,
-            power=self.spectrogram_power,
-            normalized=self.spectrogram_normalization,
-            center=False,
-        )
+        peak = self._spectrogram(wave)
 
-        return peak[0, :, 0].numpy()
+        return peak[:, 0]
 
     def _harmonics(self, hz, n=20):
         result = np.zeros_like(self.fft_freqs)
@@ -169,3 +140,16 @@ class PitchDetector:
             result += self._pure_sine_bin(hz * idx,
                                           self.fn_overtone_decay(idx))
         return result
+
+    def _spectrogram(self, waveform):
+        spectrogram = np.abs(librosa.stft(
+            y=waveform,
+            pad_mode='constant',
+            window=self.spectrogram_window.window,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.n_fft,
+            center=False,
+        ) ** self.spectrogram_power)
+
+        return spectrogram

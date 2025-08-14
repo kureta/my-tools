@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.13.11"
+__generated_with = "0.14.15"
 app = marimo.App(width="medium")
 
 
@@ -153,17 +153,15 @@ def _(Path, detector, librosa):
     return (uncut_waveform,)
 
 
-@app.cell(hide_code=True)
-def _(detector, mo, np, torch, uncut_waveform):
+@app.cell
+def _(detector, mo, np, uncut_waveform):
     waveform = uncut_waveform / np.max(np.abs(uncut_waveform))
-    waveform = torch.from_numpy(waveform)
+    # waveform = torch.from_numpy(waveform)
 
     mo.vstack(
         items=[
             # Audio(data=waveform, rate=detector.sample_rate),
-            mo.audio(
-                src=waveform.numpy(), rate=detector.sample_rate, normalize=True
-            ),
+            mo.audio(src=waveform, rate=detector.sample_rate, normalize=True),
         ]
     )
     return (waveform,)
@@ -175,7 +173,7 @@ def _():
     return (min_confidence,)
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(detector, interp1d, librosa, min_confidence, np, waveform):
     # ANALYZE
     pitch, confidence, amplitude, result = detector.detect_pitch(waveform)
@@ -226,7 +224,7 @@ def _(
     sine_wave,
 ):
     figure1, ax1 = plt.subplots(1, 1)
-    ax1.imshow(detector.factors.T, origin="lower")
+    # ax1.imshow(detector.factors.T, origin="lower")
     figure2 = plot_with_dual_y(
         pitch,
         amplitude,

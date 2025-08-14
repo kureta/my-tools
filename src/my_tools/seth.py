@@ -1,3 +1,5 @@
+# pyright: basic
+
 """
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
@@ -64,13 +66,6 @@ if __name__ == '__main__':
     r_low = 1
     alpharange = 2.3
     method = 'product'
-
-#    # Davide Verotta Figure 4 example
-#    freq = 261.63 * array([1, 2, 3, 4, 5, 6])
-#    amp = 1 / array([1, 2, 3, 4, 5, 6])
-#    r_low = 1
-#    alpharange = 2.0
-#    method = 'product'
 
     n = 3000
     diss = empty(n)
