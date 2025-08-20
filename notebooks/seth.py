@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.15"
+__generated_with = "0.14.17"
 app = marimo.App(width="medium")
 
 
@@ -89,7 +89,7 @@ def _(librosa, mo, sr):
     cello, _ = librosa.load(cello_path, mono=True, sr=sr)
 
     mo.audio(cello, sr, normalize=False)
-    return
+    return (cello,)
 
 
 @app.cell
@@ -106,6 +106,9 @@ def _(find_peaks, np, sr):
         # TODOs
         # Use Bark Scale to set the minimum distance between peaks
         # convert amplitudes to perceptual loudness for dissonance curve calculation
+        # dissonance curve calculatiopn depends on the absolute (not relative) value of amplitudes
+        # curve is completely different if all amplitudes are scaled equally by some factor
+        # is it OK?
         peaks, _ = find_peaks(
             mags, prominence=prominence, distance=50 / spec_freqs[1], height=0.01
         )
@@ -114,17 +117,15 @@ def _(find_peaks, np, sr):
     return (get_overtones,)
 
 
-app._unparsable_cell(
-    r"""
-     cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
+@app.cell
+def _(cello, get_overtones, plt):
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
 
     plt.figure(figsize=(12, 6))
     plt.plot(cello_fs, cello_mags)
-    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], \"ro\", label=\"minima\")
+    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], "ro", label="minima")
     plt.gca()
-    """,
-    name="_"
-)
+    return cello_fs, cello_mags, cello_peaks
 
 
 @app.cell
@@ -298,11 +299,38 @@ def _(nb, np):
         )
 
         return diss
-    return (dissonance,)
+    return
 
 
 @app.cell
-def _(dissonance, np):
+def _(nb, np):
+    @nb.njit
+    def get_critical_bandwidth(f: float) -> float:
+        return 94 + 71 * np.power(f / 1000, 1.5)
+
+
+    @nb.njit
+    def diso(f0: float, f1: float, a0: float, a1: float) -> float:
+        abs_delta_cbw = np.abs((f1 - f0) / get_critical_bandwidth(f0))
+        plomp = 4 * abs_delta_cbw
+        plomp *= np.exp(1 - 4 * abs_delta_cbw)
+        plomp *= np.minimum(a0, a1)
+
+        return plomp
+    return (diso,)
+
+
+@app.cell
+def _(diso, np, plt):
+    plt.plot(
+        np.linspace(440, 440 * 2.1, 1000),
+        diso(440, np.linspace(440, 440 * 2.1, 1000), 1, 1),
+    )
+    return
+
+
+@app.cell
+def _(diso, np):
     n_harmonics = 16
     harmonics = np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(1, n_harmonics + 1)
@@ -321,7 +349,7 @@ def _(dissonance, np):
     i1, i2 = np.meshgrid(indices, indices)
     i1, i2 = i1.ravel(), i2.ravel()
 
-    np.sum(dissonance(specs[i1], specs[i2], ampiks[i1], ampiks[i2]))
+    np.sum(diso(specs[i1], specs[i2], ampiks[i1], ampiks[i2]))
     return ampiks, specs
 
 
