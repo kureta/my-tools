@@ -14,62 +14,9 @@ def _():
     from scipy.signal import find_peaks
 
     import librosa
-    return find_peaks, librosa, mo, nb, np, plt
 
-
-@app.cell
-def _(np):
-    """
-    Python translation of http://sethares.engr.wisc.edu/comprog.html
-    """
-
-
-    def dissmeasure(fvec, amp, model="min"):
-        """
-        Given a list of partials in fvec, with amplitudes in amp, this routine
-        calculates the dissonance by summing the roughness of every sine pair
-        based on a model of Plomp-Levelt's roughness curve.
-        The older model (model='product') was based on the product of the two
-        amplitudes, but the newer model (model='min') is based on the minimum
-        of the two amplitudes, since this matches the beat frequency amplitude.
-        """
-        # Sort by frequency
-        sort_idx = np.argsort(fvec)
-        am_sorted = np.asarray(amp)[sort_idx]
-        fr_sorted = np.asarray(fvec)[sort_idx]
-
-        # Used to stretch dissonance curve for different freqs:
-        Dstar = 0.24  # Point of maximum dissonance
-        S1 = 0.0207
-        S2 = 18.96
-
-        C1 = 5
-        C2 = -5
-
-        # Plomp-Levelt roughness curve:
-        A1 = -3.51
-        A2 = -5.75
-
-        # Generate all combinations of frequency components
-        idx = np.transpose(np.triu_indices(len(fr_sorted), 1))
-        fr_pairs = fr_sorted[idx]
-        am_pairs = am_sorted[idx]
-
-        Fmin = fr_pairs[:, 0]
-        S = Dstar / (S1 * Fmin + S2)
-        Fdif = fr_pairs[:, 1] - fr_pairs[:, 0]
-
-        if model == "min":
-            a = np.amin(am_pairs, axis=1)
-        elif model == "product":
-            a = np.prod(am_pairs, axis=1)  # Older model
-        else:
-            raise ValueError('model should be "min" or "product"')
-        SFdif = S * Fdif
-        D = np.sum(a * (C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)))
-
-        return D
-    return (dissmeasure,)
+    from my_tools.seth import dissmeasure, diso, plot_this
+    return diso, dissmeasure, find_peaks, librosa, mo, np, plot_this, plt
 
 
 @app.cell
@@ -131,6 +78,7 @@ def _(cello, get_overtones, plt):
 @app.cell
 def _(get_overtones, plt, tamtam):
     fs, mags, tamtam_peaks = get_overtones(tamtam, prominence=0.01)
+    tamtam_peaks = tamtam_peaks[1:]
 
     plt.figure(figsize=(12, 6))
     plt.plot(fs, mags)
@@ -154,7 +102,7 @@ def _(
 ):
     freq1 = fs[tamtam_peaks]
     amp1 = mags[tamtam_peaks]
-    f0 = fs[tamtam_peaks][1]
+    f0 = fs[tamtam_peaks][0]
     freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
     amp2 = cello_mags[cello_peaks]
 
@@ -163,7 +111,7 @@ def _(
     # amp2 = 1 / np.array(range(1, n_harm + 1))
 
     r_low = 1.0
-    alpharange = 4.1
+    alpharange = 2.1
     method = "min"
 
     n = 3000
@@ -201,7 +149,7 @@ def _(
 
     plt.tight_layout()
     plt.gca()
-    return method, peaks, x
+    return peaks, x
 
 
 @app.cell
@@ -280,47 +228,6 @@ def _(mo):
 
 
 @app.cell
-def _(nb, np):
-    @nb.njit
-    def dissonance(freq1: float, freq2: float, amp1: float, amp2: float) -> float:
-        b1 = 3.5
-        b2 = 5.75
-        x_star = 0.24
-        s1 = 0.021
-        s2 = 19
-
-        min_freq = np.minimum(freq1, freq2)
-        min_amp = np.minimum(amp1, amp2)
-        delta_freq = np.abs(freq1 - freq2)
-        s = x_star / (s1 * min_freq + s2)
-
-        diss = min_amp * (
-            np.exp(-b1 * s * (delta_freq)) - np.exp(-b2 * s * delta_freq)
-        )
-
-        return diss
-    return
-
-
-@app.cell
-def _(nb, np):
-    @nb.njit
-    def get_critical_bandwidth(f: float) -> float:
-        return 94 + 71 * np.power(f / 1000, 1.5)
-
-
-    @nb.njit
-    def diso(f0: float, f1: float, a0: float, a1: float) -> float:
-        abs_delta_cbw = np.abs((f1 - f0) / get_critical_bandwidth(f0))
-        plomp = 4 * abs_delta_cbw
-        plomp *= np.exp(1 - 4 * abs_delta_cbw)
-        plomp *= np.minimum(a0, a1)
-
-        return plomp
-    return (diso,)
-
-
-@app.cell
 def _(diso, np, plt):
     plt.plot(
         np.linspace(440, 440 * 2.1, 1000),
@@ -330,32 +237,35 @@ def _(diso, np, plt):
 
 
 @app.cell
-def _(diso, np):
-    n_harmonics = 16
+def _(diso, np, plt):
+    n_harmonics = 32
     harmonics = np.arange(1, n_harmonics + 1)
-    amps = 0.88 ** np.arange(1, n_harmonics + 1)
+    amps = 0.88 ** np.arange(0, n_harmonics)
 
-    base_freq = 440.0
+    base_freq = 500.0
     f1 = base_freq
-    f2 = base_freq * 2 ** (1 / 12)
 
-    spec1 = f1 * harmonics
-    spec2 = f2 * harmonics
+    num = 5000
+    curve = np.empty(num)
+    for idx, factor in enumerate(np.linspace(1, 2.3, num)):
+        f2 = base_freq * factor
 
-    specs = np.concatenate([spec1, spec2])
-    ampiks = np.concatenate([amps, amps])
+        spec1 = f1 * harmonics
+        spec2 = f2 * harmonics
 
-    indices = np.arange(len(specs))
-    i1, i2 = np.meshgrid(indices, indices)
-    i1, i2 = i1.ravel(), i2.ravel()
+        curve[idx] = np.sum(
+            diso(spec1[:, None], spec2[None, :], amps[:, None], amps[None, :])
+        )
 
-    np.sum(diso(specs[i1], specs[i2], ampiks[i1], ampiks[i2]))
-    return ampiks, specs
+    plt.figure(figsize=(8.3, 3.3))
+    plt.plot(np.linspace(1, 2.3, num), curve)
+    plt.show()
+    return
 
 
 @app.cell
-def _(ampiks, dissmeasure, method, specs):
-    dissmeasure(specs, ampiks, method)
+def _(plot_this):
+    plot_this()
     return
 
 
