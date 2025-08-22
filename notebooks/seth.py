@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.17"
+__generated_with = "0.15.0"
 app = marimo.App(width="medium")
 
 
@@ -59,6 +59,8 @@ def _(find_peaks, np, sr):
         peaks, _ = find_peaks(
             mags, prominence=prominence, distance=50 / spec_freqs[1], height=0.01
         )
+        # TODO: select highest n peaks
+        # peaks = np.sort(np.array(sorted(peaks, key=lambda x: mags[x], reverse=True)[:30]))
 
         return fs, mags, peaks
     return (get_overtones,)
@@ -105,10 +107,6 @@ def _(
     f0 = fs[tamtam_peaks][0]
     freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
     amp2 = cello_mags[cello_peaks]
-
-    # n_harm = 21
-    # freq2 = f0 * (np.array(range(1, n_harm + 1)) ** 1.05)
-    # amp2 = 1 / np.array(range(1, n_harm + 1))
 
     r_low = 1.0
     alpharange = 2.1
@@ -228,21 +226,12 @@ def _(mo):
 
 
 @app.cell
-def _(diso, np, plt):
-    plt.plot(
-        np.linspace(440, 440 * 2.1, 1000),
-        diso(440, np.linspace(440, 440 * 2.1, 1000), 1, 1),
-    )
-    return
-
-
-@app.cell
-def _(diso, np, plt):
-    n_harmonics = 32
+def _(diso, find_peaks, np, plt):
+    n_harmonics = 6
     harmonics = np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
-    base_freq = 500.0
+    base_freq = 220.0
     f1 = base_freq
 
     num = 5000
@@ -257,9 +246,34 @@ def _(diso, np, plt):
             diso(spec1[:, None], spec2[None, :], amps[:, None], amps[None, :])
         )
 
-    plt.figure(figsize=(8.3, 3.3))
-    plt.plot(np.linspace(1, 2.3, num), curve)
-    plt.show()
+
+    xpeaks, xprops = find_peaks(-curve, prominence=0.05)
+
+    xx = np.linspace(1, 2.3, num)
+
+    plt.figure(figsize=(12, 6))
+    plt.plot(xx, curve)
+    plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
+    plt.xscale("log")
+    plt.xlim(1, 2.3)
+
+    plt.xlabel("frequency ratio")
+    plt.ylabel("sensory dissonance")
+
+    # 1) draw vertical dashed lines at each minima
+    for xii in xx[xpeaks]:
+        plt.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
+
+    plt.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
+
+    # 2) add ticks at those x‐positions and label them with their numerical values
+    plt.minorticks_off()
+    plt.xticks(
+        xx[xpeaks], [f"{int(np.round(t))}" for t in np.log2(xx[xpeaks]) * 1200]
+    )
+
+    plt.tight_layout()
+    plt.gca()
     return
 
 
