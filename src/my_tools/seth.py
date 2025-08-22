@@ -72,16 +72,16 @@ def get_critical_bandwidth(f):
 
     # digitize returns indices 1..len(edges); subtract 1 to index bandwidths
     idx = np.digitize(f, edges) - 1
-    return bandwidths[idx][:, 0]
+    return bandwidths[idx]
 
 
 def diso(f0, f1, a0, a1):
-    k = 5
-    cbw = get_critical_bandwidth(f0)
+    k = 4
+    cbw = get_critical_bandwidth(f0[0])
     abs_delta_cbw = np.abs((f1 - f0) / cbw)
     plomp = k * abs_delta_cbw
     plomp *= np.exp(1 - k * abs_delta_cbw)
-    # TODO: can also get minimum of amplitudes.
+    # TODO: minimum or product of amplitudes.
     # plomp *= a0 * a1
     plomp *= np.minimum(a0, a1)
 
@@ -140,8 +140,8 @@ def plot_this():
     Reproduce Sethares Figure 3
     http://sethares.engr.wisc.edu/consemi.html#anchor15619672
     """
-    freq = 500 * np.arange(1, 16)
-    amp = 0.88 ** np.arange(0, 15)
+    freq = 500 * np.arange(1, 21)
+    amp = 0.88 ** np.arange(0, 20)
     r_low = 1
     alpharange = 2.3
     method = "min"
@@ -154,7 +154,7 @@ def plot_this():
         d = dissmeasure(f, a, method)
         diss[i] = d
 
-    plt.figure(figsize=(7, 3))
+    plt.figure(figsize=(11, 3))
     plt.plot(np.linspace(r_low, alpharange, len(diss)), diss)
     plt.xlim(r_low, alpharange)
 

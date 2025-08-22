@@ -20,47 +20,62 @@ def _():
 
 
 @app.cell
-def _(librosa, mo):
+def _(librosa, mo, np):
     tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
     # tamtam_path = "/home/kureta/Music/easy_thunder__thundergong1.flac"
     sr = 44100
     tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
+    tamtam /= np.abs(tamtam).max()
 
-    mo.audio(tamtam, sr, normalize=False)
+    mo.audio(tamtam, sr, normalize=True)
     return sr, tamtam
 
 
 @app.cell
-def _(librosa, mo, sr):
+def _(librosa, mo, np, sr):
     cello_path = "/home/kureta/Music/IRCAM/orchideaSOL2020/_OrchideaSOL2020_release/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-C2-ff-4c-N.wav"
     cello, _ = librosa.load(cello_path, mono=True, sr=sr)
+    cello /= np.abs(cello).max()
 
-    mo.audio(cello, sr, normalize=False)
+    mo.audio(cello, sr, normalize=True)
     return (cello,)
 
 
 @app.cell
-def _(find_peaks, np, sr):
-    def get_overtones(audio, prominence=0.05):
-        spectrum = np.abs(np.fft.rfft(audio))
-        spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
+def _(find_peaks, librosa, np, sr):
+    def get_overtones(audio, min_delta_f=25.96, max_delta_db=24, max_f=4434.92):
+        """Calculates peaks of the spectrum to take as overtones of a sound
 
-        filtered_freqs_idx = spec_freqs <= 4000
+        audio = audio
+        min_delta_f = minimum distance between overtones (in Hz). 25.96 is a half-step below the lowest note on the piano
+        max_delta_db = overtones with a loudness this much lower than the loudes overtone will be ignored
+        max_f = frequencies above this will be ignored. 4434.92 is a half-step above the highest note on the piano
+        """
+        # absolute value of stft (amplitudes)
+        spectrum = np.abs(np.fft.rfft(audio, norm="forward"))
+        # frequency at index (bin to Hz array)
+        spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
+        # cut frequencies above threshold
+        filtered_freqs_idx = spec_freqs <= max_f
         fs = spec_freqs[filtered_freqs_idx]
         mags = spectrum[filtered_freqs_idx]
-        mags /= mags.max()
+        # Convert amplitude to db
+        mags = librosa.amplitude_to_db(mags, ref=1.0, amin=1e-10, top_db=None)
+        # TODO: temporary workaround for negative values messing up the dissonance curve calculation
+        mags += 100
+        # calculate overtone loudness lower limit
+        highest = mags.max()
+        lower_limit = highest - max_delta_db
 
-        # TODOs
-        # Use Bark Scale to set the minimum distance between peaks
-        # convert amplitudes to perceptual loudness for dissonance curve calculation
+        # NOTE:
         # dissonance curve calculatiopn depends on the absolute (not relative) value of amplitudes
         # curve is completely different if all amplitudes are scaled equally by some factor
         # is it OK?
         peaks, _ = find_peaks(
-            mags, prominence=prominence, distance=50 / spec_freqs[1], height=0.01
+            mags,
+            distance=min_delta_f / spec_freqs[1],
+            height=lower_limit,
         )
-        # TODO: select highest n peaks
-        # peaks = np.sort(np.array(sorted(peaks, key=lambda x: mags[x], reverse=True)[:30]))
 
         return fs, mags, peaks
     return (get_overtones,)
@@ -68,7 +83,7 @@ def _(find_peaks, np, sr):
 
 @app.cell
 def _(cello, get_overtones, plt):
-    cello_fs, cello_mags, cello_peaks = get_overtones(cello, prominence=0.01)
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello)
 
     plt.figure(figsize=(12, 6))
     plt.plot(cello_fs, cello_mags)
@@ -79,8 +94,7 @@ def _(cello, get_overtones, plt):
 
 @app.cell
 def _(get_overtones, plt, tamtam):
-    fs, mags, tamtam_peaks = get_overtones(tamtam, prominence=0.01)
-    tamtam_peaks = tamtam_peaks[1:]
+    fs, mags, tamtam_peaks = get_overtones(tamtam)
 
     plt.figure(figsize=(12, 6))
     plt.plot(fs, mags)
@@ -122,7 +136,7 @@ def _(
 
     # 2) find local minima: a point i is a local minimum if y[i-1] > y[i] < y[i+1]
     #    so we look for sign changes in the discrete derivative
-    peaks, props = find_peaks(-diss, prominence=0.05)
+    peaks, props = find_peaks(-diss, prominence=0.15)
 
     x = np.linspace(r_low, alpharange, len(diss))
 
@@ -227,14 +241,14 @@ def _(mo):
 
 @app.cell
 def _(diso, find_peaks, np, plt):
-    n_harmonics = 6
+    n_harmonics = 20
     harmonics = np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
     base_freq = 220.0
     f1 = base_freq
 
-    num = 5000
+    num = 3000
     curve = np.empty(num)
     for idx, factor in enumerate(np.linspace(1, 2.3, num)):
         f2 = base_freq * factor
@@ -242,16 +256,26 @@ def _(diso, find_peaks, np, plt):
         spec1 = f1 * harmonics
         spec2 = f2 * harmonics
 
+        spekis = np.concatenate([spec1, spec2])
+        ampiks = np.concatenate([amps, amps])
+
+        ia, ja = np.triu_indices(spekis.size, k=1)
+        left_spekis = spekis[ia]
+        right_spekis = spekis[ja]
+
+        ib, jb = np.triu_indices(ampiks.size, k=1)
+        left_ampiks = ampiks[ia]
+        right_ampiks = ampiks[ja]
+
         curve[idx] = np.sum(
-            diso(spec1[:, None], spec2[None, :], amps[:, None], amps[None, :])
+            diso(left_spekis, right_spekis, left_ampiks, right_ampiks)
         )
 
-
-    xpeaks, xprops = find_peaks(-curve, prominence=0.05)
+    xpeaks, xprops = find_peaks(-curve, prominence=0.15)
 
     xx = np.linspace(1, 2.3, num)
 
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(11, 3), constrained_layout=True)
     plt.plot(xx, curve)
     plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
     plt.xscale("log")
@@ -272,14 +296,58 @@ def _(diso, find_peaks, np, plt):
         xx[xpeaks], [f"{int(np.round(t))}" for t in np.log2(xx[xpeaks]) * 1200]
     )
 
-    plt.tight_layout()
-    plt.gca()
+    plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
+
+    plt.gcf()
     return
 
 
 @app.cell
 def _(plot_this):
     plot_this()
+    return
+
+
+@app.cell
+def _():
+    import utils.plot_helpers as ph
+    return (ph,)
+
+
+@app.cell
+def _(ph):
+    ph.simple_plot()
+    return
+
+
+@app.cell
+def _(ph):
+    ph.dual_xaxis_plot()
+    return
+
+
+@app.cell
+def _(ph):
+    ph.grid_plot()
+    return
+
+
+@app.cell
+def _(np):
+    left = np.array([1, 2, 3, 4])
+    right = np.array([5, 6, 7, 8])
+
+    entire = np.concatenate([left, right])
+
+    ii, jj = np.tril_indices(entire.size, k=-1)
+    first = entire[ii]
+    second = entire[jj]
+    return first, second
+
+
+@app.cell
+def _(first, second):
+    first, second
     return
 
 
