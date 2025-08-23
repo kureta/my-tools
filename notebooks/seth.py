@@ -257,13 +257,14 @@ def _(diso, find_peaks, np, plt):
 
     f1 = 220.0
 
-    # TODO: number of points = number of cents
-    num = 3000
+    # 0.5 cent steps
+    num = 2600
+    cents_sweep = np.linspace(0, num // 2, num)
 
     # axis 0: different frequency ratios
     # axis 1: different harmonics
     # all combinations of f1 * harmonics and f2 * harmonics
-    f2 = f1 * np.linspace(1, 2.3, num)
+    f2 = f1 * 2 ** (cents_sweep / 1200)
     all_spec2s = f2[:, None] * harmonics[None, :]
     # match the dimension of harmonics b ystacking num of them at axis 0
     spec1s = np.tile(f1 * harmonics[None, :], (num, 1))
@@ -282,13 +283,13 @@ def _(diso, find_peaks, np, plt):
 
     xpeaks, xprops = find_peaks(-curve, prominence=0.15)
 
-    xx = np.linspace(1, 2.3, num)
+    xx = cents_sweep
 
     plt.figure(figsize=(11, 3), constrained_layout=True)
     plt.plot(xx, curve)
     plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
-    plt.xscale("log")
-    plt.xlim(1, 2.3)
+    # plt.xscale("log")
+    # plt.xlim(1, 2.3)
 
     plt.xlabel("frequency ratio")
     plt.ylabel("sensory dissonance")
@@ -302,7 +303,7 @@ def _(diso, find_peaks, np, plt):
     # 2) add ticks at those x‐positions and label them with their numerical values
     plt.minorticks_off()
     plt.xticks(
-        xx[xpeaks], [f"{int(np.round(t))}" for t in np.log2(xx[xpeaks]) * 1200]
+        xx[xpeaks], format_list := [f"{int(np.round(t))}" for t in xx[xpeaks]]
     )
 
     plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
