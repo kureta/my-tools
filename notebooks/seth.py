@@ -234,9 +234,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""## My attempt at a cleaner and faster version of the dissonance curve calculation"""
-    )
+    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
     return
 
 
@@ -255,7 +253,7 @@ def _(diso, find_peaks, np, plt):
     harmonics = np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
-    f1 = 220.0
+    f1 = 440.0
 
     # 0.5 cent steps
     num = 2600
@@ -283,6 +281,9 @@ def _(diso, find_peaks, np, plt):
         diso(left_spekis, right_spekis, left_ampiks, right_ampiks), axis=1
     )
 
+    curve -= curve.min()
+    curve /= curve.max()
+
     # xpeaks, xprops = find_peaks(-curve, prominence=0.15)
 
     xx = cents_sweep
@@ -291,11 +292,11 @@ def _(diso, find_peaks, np, plt):
     plt.plot(xx, curve)
     # plt.plot(xx, 10 * np.gradient(curve, xx), color="gray")
     # TODO: find peaks of the second derivative instead
-    plt.plot(xx, 80 * np.gradient(np.gradient(curve, xx), xx), color="green")
+    ddcurve = np.gradient(np.gradient(curve, xx), xx)
+    ddcurve /= ddcurve.max()
+    plt.plot(xx, ddcurve, color="green", alpha=0.6)
     # plt.plot(xx, 100 * np.gradient(curve, xx), color="green")
-    dpeaks, dprops = find_peaks(
-        np.gradient(np.gradient(curve, xx), xx), height=0.04
-    )
+    dpeaks, dprops = find_peaks(ddcurve, height=0.2)
     plt.plot(xx[dpeaks], curve[dpeaks], "ro", label="minima")
     # plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
     # plt.xscale("log")
@@ -319,7 +320,13 @@ def _(diso, find_peaks, np, plt):
     plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
 
     plt.gcf()
-    return dpeaks, dprops, xx
+    return curve, dpeaks, dprops, f1, f2, xx
+
+
+@app.cell
+def _(curve, f1, f2):
+    curve[0], f1, f2[0]
+    return
 
 
 @app.cell
@@ -358,6 +365,65 @@ def _(ph):
 @app.cell
 def _(ph):
     ph.grid_plot()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+    The roughness R of a signal whose spectrum has two sinusoidal components with frequencies f1, f2 and amplitudes A1, A2, where fmin = min(f1, f2),  fmax = max(f1, f2),  Amin = min(A1, A2),  Amax = max(A1, A2), is:
+
+       R = X0.1*0.5(Y3.11)*Z      where
+
+           X = Amin*Amax
+           The term X0.1 represents the dependence of roughness on intensity (related to the amplitude of the added sines). It is based on Terhardt (1974), adjusted (Vassilakis, 2000, 2001) to account for the quantitative difference between modulation depth (used in Terhardt, 1974) and amplitude fluctuation degree (the signal parameter influencing roughness). 
+
+           Y = 2Amin / (Amin+Amax )
+           The term Y3.11 represents the dependence of roughness on amplitude fluctuation degree (related to the amplitude difference of the added sines). It, too, is based on Terhard (1974), adjusted (Vassilakis, 2000, 2001) to account for the quantitative difference between modulation depth and amplitude fluctuation degree.
+
+           Z = e-b1s(fmax - fmin) - e-b2s(fmax - fmin), 
+           [b1 = 3.5;  b2 = 5.75;  s = 0.24/(s1fmin + s2);  s1 = 0.0207;  s2 = 18.96]
+           The term Z represents the dependence of roughness on amplitude fluctuation rate (frequency difference of the added sines) and register (frequency of the lower sine). It is based on Sethares's (1998) modeling of the roughness curves in Figure 1, below, curves that have been derived from multiple perceptual experiments examining the roughness of pairs of sines (Plomp & Levelt, 1965; Kameoka & Kuriyagawa, 1969a&b).
+    """
+    )
+    return
+
+
+@app.cell
+def _(np):
+    def roughness(f1, f2, a1, a2):
+        amin = np.minimum(a1, a2)
+        amax = np.maximum(a1, a2)
+        fmin = np.minimum(f1, f2)
+        fmax = np.maximum(f1, f2)
+        x = amax * amin
+        y = 2 * amin / (amin + amax)
+        b1 = 3.5
+        b2 = 5.75
+        s1 = 0.0207
+        s2 = 18.9
+        s = 0.24 / (s1 * fmin + s2)
+        z = np.exp(-b1 * s * (fmax - fmin)) - np.exp(-b2 * s * (fmax - fmin))
+        r = (x**0.1) * 0.5 * (y**3.11) * z
+
+        return r
+    return (roughness,)
+
+
+@app.cell
+def _(np, plt, roughness):
+    start_f = 110
+    sweep_factor = np.linspace(1, 2.3, 1000)
+    plt.plot(sweep_factor, roughness(start_f, start_f * sweep_factor, 1.0, 1.0))
+    return (sweep_factor,)
+
+
+@app.cell
+def _(np, plt, roughness, sweep_factor):
+    start_f1 = 880
+    sweep_factor1 = np.linspace(1, 2.3, 1000)
+    plt.plot(sweep_factor, roughness(start_f1, start_f1 * sweep_factor1, 1.0, 1.0))
     return
 
 
