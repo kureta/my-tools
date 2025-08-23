@@ -65,9 +65,11 @@ bandwidths = np.array(
 )
 
 
-def get_critical_bandwidth(f):
+def get_critical_bandwidth_(f):
+    # TODO: commented out line will be used once real basis for cbw is fixed
     # check bounds
-    if f.min() < edges[0] or f.max() >= edges[-1]:
+    # if (np.min(f, axis=1) < edges[0]).any() or (f.max(axis=1) >= edges[-1]).any():
+    if f < edges[0] or f >= edges[-1]:
         raise ValueError(f"Frequencies must be in [20, 15500) {f=}")
 
     # digitize returns indices 1..len(edges); subtract 1 to index bandwidths
@@ -75,10 +77,17 @@ def get_critical_bandwidth(f):
     return bandwidths[idx]
 
 
+def get_critical_bandwidth(f):
+    cbw = 25 + 75 * (1 + 1.4 * (f / 1000) ** 2) ** 0.69
+    return cbw
+
+
+# TODO: this `fundamental` is wrong. cbw should be different for all pairs of frequencies
 def diso(f0, f1, a0, a1):
     k = 4
-    cbw = get_critical_bandwidth(f0[0])
-    abs_delta_cbw = np.abs((f1 - f0) / cbw)
+    cbw = get_critical_bandwidth(np.minimum(f0, f1))
+    # cbw = get_critical_bandwidth(fundamental)
+    abs_delta_cbw = np.abs(f1 - f0) / cbw
     plomp = k * abs_delta_cbw
     plomp *= np.exp(1 - k * abs_delta_cbw)
     # TODO: minimum or product of amplitudes.

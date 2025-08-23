@@ -6,11 +6,12 @@ app = marimo.App(width="medium")
 
 @app.cell
 def _():
+    # pyright: basic
+
     import marimo as mo
     import matplotlib.pyplot as plt
 
     import numpy as np
-    import numba as nb
     from scipy.signal import find_peaks
 
     import librosa
@@ -240,36 +241,44 @@ def _(mo):
 
 
 @app.cell
+def _(diso, np, plt):
+    f_zero = 100.0
+    x_axis = (f_zero * np.linspace(1, 3, 1000))[None, :]
+    y_axis = diso(np.array([[f_zero]]), x_axis, 1.0, 1.0)
+    plt.plot(x_axis[0], y_axis[0])
+    return
+
+
+@app.cell
 def _(diso, find_peaks, np, plt):
     n_harmonics = 20
     harmonics = np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
-    base_freq = 220.0
-    f1 = base_freq
+    f1 = 220.0
 
+    # TODO: number of points = number of cents
     num = 3000
-    curve = np.empty(num)
-    for idx, factor in enumerate(np.linspace(1, 2.3, num)):
-        f2 = base_freq * factor
 
-        spec1 = f1 * harmonics
-        spec2 = f2 * harmonics
-
-        spekis = np.concatenate([spec1, spec2])
-        ampiks = np.concatenate([amps, amps])
-
-        ia, ja = np.triu_indices(spekis.size, k=1)
-        left_spekis = spekis[ia]
-        right_spekis = spekis[ja]
-
-        ib, jb = np.triu_indices(ampiks.size, k=1)
-        left_ampiks = ampiks[ia]
-        right_ampiks = ampiks[ja]
-
-        curve[idx] = np.sum(
-            diso(left_spekis, right_spekis, left_ampiks, right_ampiks)
-        )
+    # axis 0: different frequency ratios
+    # axis 1: different harmonics
+    # all combinations of f1 * harmonics and f2 * harmonics
+    f2 = f1 * np.linspace(1, 2.3, num)
+    all_spec2s = f2[:, None] * harmonics[None, :]
+    # match the dimension of harmonics b ystacking num of them at axis 0
+    spec1s = np.tile(f1 * harmonics[None, :], (num, 1))
+    # same for amps
+    all_amps = np.tile(amps[None, :], (num, 1))
+    all_spekis = np.concatenate([spec1s, all_spec2s], axis=1)
+    all_ampiks = np.concatenate([all_amps, all_amps], axis=1)
+    ia, ja = np.triu_indices(all_spekis.shape[1], k=1)
+    left_spekis = all_spekis[:, ia]
+    right_spekis = all_spekis[:, ja]
+    left_ampiks = all_ampiks[:, ia]
+    right_ampiks = all_ampiks[:, ja]
+    curve = np.sum(
+        diso(left_spekis, right_spekis, left_ampiks, right_ampiks), axis=1
+    )
 
     xpeaks, xprops = find_peaks(-curve, prominence=0.15)
 
@@ -329,25 +338,6 @@ def _(ph):
 @app.cell
 def _(ph):
     ph.grid_plot()
-    return
-
-
-@app.cell
-def _(np):
-    left = np.array([1, 2, 3, 4])
-    right = np.array([5, 6, 7, 8])
-
-    entire = np.concatenate([left, right])
-
-    ii, jj = np.tril_indices(entire.size, k=-1)
-    first = entire[ii]
-    second = entire[jj]
-    return first, second
-
-
-@app.cell
-def _(first, second):
-    first, second
     return
 
 
