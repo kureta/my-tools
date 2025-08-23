@@ -273,6 +273,8 @@ def _(diso, find_peaks, np, plt):
     all_spekis = np.concatenate([spec1s, all_spec2s], axis=1)
     all_ampiks = np.concatenate([all_amps, all_amps], axis=1)
     ia, ja = np.triu_indices(all_spekis.shape[1], k=1)
+    # TODO: use ordered pairs. this way we'll do the calculations in units of both lower and
+    # higher frequency's critical band widths
     left_spekis = all_spekis[:, ia]
     right_spekis = all_spekis[:, ja]
     left_ampiks = all_ampiks[:, ia]
@@ -281,13 +283,21 @@ def _(diso, find_peaks, np, plt):
         diso(left_spekis, right_spekis, left_ampiks, right_ampiks), axis=1
     )
 
-    xpeaks, xprops = find_peaks(-curve, prominence=0.15)
+    # xpeaks, xprops = find_peaks(-curve, prominence=0.15)
 
     xx = cents_sweep
 
     plt.figure(figsize=(11, 3), constrained_layout=True)
     plt.plot(xx, curve)
-    plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
+    # plt.plot(xx, 10 * np.gradient(curve, xx), color="gray")
+    # TODO: find peaks of the second derivative instead
+    plt.plot(xx, 80 * np.gradient(np.gradient(curve, xx), xx), color="green")
+    # plt.plot(xx, 100 * np.gradient(curve, xx), color="green")
+    dpeaks, dprops = find_peaks(
+        np.gradient(np.gradient(curve, xx), xx), height=0.04
+    )
+    plt.plot(xx[dpeaks], curve[dpeaks], "ro", label="minima")
+    # plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
     # plt.xscale("log")
     # plt.xlim(1, 2.3)
 
@@ -295,7 +305,7 @@ def _(diso, find_peaks, np, plt):
     plt.ylabel("sensory dissonance")
 
     # 1) draw vertical dashed lines at each minima
-    for xii in xx[xpeaks]:
+    for xii in xx[dpeaks]:
         plt.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
 
     plt.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
@@ -303,12 +313,21 @@ def _(diso, find_peaks, np, plt):
     # 2) add ticks at those x‐positions and label them with their numerical values
     plt.minorticks_off()
     plt.xticks(
-        xx[xpeaks], format_list := [f"{int(np.round(t))}" for t in xx[xpeaks]]
+        xx[dpeaks], format_list := [f"{int(np.round(t))}" for t in xx[dpeaks]]
     )
 
     plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
 
     plt.gcf()
+    return dpeaks, dprops, xx
+
+
+@app.cell
+def _(dpeaks, dprops, np, xx):
+    heights = dprops["peak_heights"]
+    order = np.argsort(heights)[::-1]
+
+    np.round(xx[dpeaks][order])
     return
 
 

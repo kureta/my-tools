@@ -66,9 +66,7 @@ bandwidths = np.array(
 
 
 def get_critical_bandwidth_(f):
-    # TODO: commented out line will be used once real basis for cbw is fixed
     # check bounds
-    # if (np.min(f, axis=1) < edges[0]).any() or (f.max(axis=1) >= edges[-1]).any():
     if f < edges[0] or f >= edges[-1]:
         raise ValueError(f"Frequencies must be in [20, 15500) {f=}")
 
@@ -82,7 +80,6 @@ def get_critical_bandwidth(f):
     return cbw
 
 
-# TODO: this `fundamental` is wrong. cbw should be different for all pairs of frequencies
 def diso(f0, f1, a0, a1):
     k = 4
     cbw = get_critical_bandwidth(np.minimum(f0, f1))
