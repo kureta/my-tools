@@ -19,6 +19,7 @@ def _():
 
     from my_tools.seth import dissonance, prepare_sweep, plot_curve, get_peaks
     return (
+        Figure,
         dissonance,
         find_peaks,
         get_peaks,
@@ -117,6 +118,7 @@ def _(get_overtones, plt, tamtam):
 
 @app.cell
 def _(
+    Figure,
     cello_fs,
     cello_mags,
     cello_peaks,
@@ -147,12 +149,14 @@ def _(
     )
     # calculate dissonance curve
     dissonance_curve = dissonance(bin_pairs, amp_pairs, model="min")
+    peaks, d2curve = get_peaks(cents, dissonance_curve, height=0.2)
 
     # find peaks in the dissonance curve
     height = 0.70
-    print(np.round(get_peaks(cents, dissonance_curve, height=height)).astype(int))
+    print(np.round(peaks).astype(int))
     #  and plot the curve with the peaks marked
-    plot_curve(cents, dissonance_curve, height=height)
+    fig = Figure(figsize=(12, 4), dpi=100)
+    plot_curve(cents, dissonance_curve, d2curve, peaks, fig)
     return
 
 
@@ -183,12 +187,14 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
+    mo.md(
+        r"""## My attempt at a cleaner and faster version of the dissonance curve calculation"""
+    )
     return
 
 
 @app.cell
-def _(dissonance, get_peaks, np, plot_curve, prepare_sweep):
+def _(Figure, dissonance, get_peaks, np, plot_curve, prepare_sweep):
     # prepare partials
     n_harmonics = 20
     f1 = 440.0
@@ -213,12 +219,13 @@ def _(dissonance, get_peaks, np, plot_curve, prepare_sweep):
     )
     # calculate dissonance curve
     curve = dissonance(pairs_spekis, pairs_ampiks, model="min")
+    ppeaks, id2curve = get_peaks(x_axis, curve, height=0.2)
 
     # find peaks in the dissonance curve
     k = 0.25
-    print(get_peaks(x_axis, curve, height=k))
+    print(x_axis[ppeaks])
     #  and plot the curve with the peaks marked
-    plot_curve(x_axis, curve, height=k)
+    plot_curve(x_axis, curve, id2curve, ppeaks, Figure(figsize=(12, 4)))
     return
 
 

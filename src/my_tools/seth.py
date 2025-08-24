@@ -9,6 +9,13 @@ import numpy as np
 from scipy.signal import find_peaks
 
 
+def get_harmonic_spectrum(f0=440, n_harmonics=20, decay=0.88):
+    harmonics = f0 * np.arange(1, n_harmonics + 1)
+    amplitudes = decay ** np.arange(0, n_harmonics)
+
+    return harmonics, amplitudes
+
+
 def dissonance(fvec, amp, model="min"):
     """
     Given a list of partials in fvec, with amplitudes in amp, this routine
@@ -88,22 +95,15 @@ def get_peaks(x_axis, curve, height=0.2):
 
     dpeaks, _ = find_peaks(second_derivative, height=height)
 
-    return x_axis[dpeaks]
+    return dpeaks, second_derivative
 
 
-def plot_curve(x_axis, curve, height=0.2, figsize=(12, 4), dpi=100):
-    second_derivative = np.gradient(np.gradient(curve, x_axis), x_axis)
-    second_derivative -= second_derivative.min()
-    second_derivative /= second_derivative.max()
-
-    dpeaks, _ = find_peaks(second_derivative, height=height)
-
-    fig = Figure(figsize=figsize, dpi=dpi)
-    ax1 = fig.add_axes((0.1, 0.1, 0.8, 0.8))
+def plot_curve(x_axis, curve, d2curve, dpeaks, fig):
+    ax1 = fig.add_axes((0.1, 0.15, 0.8, 0.8))
     ax2 = ax1.twinx()
 
     ax1.plot(x_axis, curve, color="blue")
-    ax2.plot(x_axis, second_derivative, color="gray", alpha=0.6)
+    ax2.plot(x_axis, d2curve, color="gray", alpha=0.6)
     ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
 
     for xii in x_axis[dpeaks]:
