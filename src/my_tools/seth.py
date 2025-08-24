@@ -7,83 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-# interval edges (inclusive at left, exclusive at right except last)
-edges = np.array(
-    [
-        20,
-        100,
-        400,
-        510,
-        630,
-        770,
-        920,
-        1080,
-        1270,
-        1480,
-        1720,
-        2000,
-        2320,
-        2700,
-        3150,
-        3700,
-        4400,
-        5300,
-        6400,
-        7700,
-        9500,
-        12000,
-        15500,
-    ]
-)
-
-# bandwidths for each interval
-bandwidths = np.array(
-    [
-        80,
-        100,
-        110,
-        120,
-        140,
-        150,
-        160,
-        190,
-        210,
-        240,
-        280,
-        320,
-        380,
-        450,
-        550,
-        700,
-        900,
-        1100,
-        1300,
-        1800,
-        2500,
-        3500,
-    ]
-)
-
-
-def get_critical_bandwidth_(f):
-    # check bounds
-    if f < edges[0] or f >= edges[-1]:
-        raise ValueError(f"Frequencies must be in [20, 15500) {f=}")
-
-    # digitize returns indices 1..len(edges); subtract 1 to index bandwidths
-    idx = np.digitize(f, edges) - 1
-    return bandwidths[idx]
-
-
 def get_critical_bandwidth(f):
     cbw = 25 + 75 * (1 + 1.4 * (f / 1000) ** 2) ** 0.69
     return cbw
 
 
 def diso(f0, f1, a0, a1):
-    k = 4
     cbw = get_critical_bandwidth(np.minimum(f0, f1))
-    # cbw = get_critical_bandwidth(fundamental)
     abs_delta_cbw = np.abs(f1 - f0) / cbw
     plomp = k * abs_delta_cbw
     plomp *= np.exp(1 - k * abs_delta_cbw)
