@@ -17,8 +17,6 @@ def diso(f0, f1, a0, a1):
     abs_delta_cbw = np.abs(f1 - f0) / cbw
     plomp = 4 * abs_delta_cbw
     plomp *= np.exp(1 - 4 * abs_delta_cbw)
-    # TODO: minimum or product of amplitudes.
-    # plomp *= a0 * a1
     plomp *= np.minimum(a0, a1)
 
     return plomp
