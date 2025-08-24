@@ -16,8 +16,18 @@ def _():
 
     import librosa
 
-    from my_tools.seth import dissmeasure, diso, plot_this
-    return diso, dissmeasure, find_peaks, librosa, mo, np, plot_this, plt
+    from my_tools.seth import dissmeasure, plot_this, dissoss, prepare_sweep
+    return (
+        dissmeasure,
+        dissoss,
+        find_peaks,
+        librosa,
+        mo,
+        np,
+        plot_this,
+        plt,
+        prepare_sweep,
+    )
 
 
 @app.cell
@@ -234,79 +244,43 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
+    mo.md(
+        r"""## My attempt at a cleaner and faster version of the dissonance curve calculation"""
+    )
     return
 
 
 @app.cell
-def _(diso, np, plt):
-    f_zero = 100.0
-    x_axis = (f_zero * np.linspace(1, 3, 1000))[None, :]
-    y_axis = diso(np.array([[f_zero]]), x_axis, 1.0, 1.0)
-    plt.plot(x_axis[0], y_axis[0])
-    return
-
-
-@app.cell
-def _(diso, find_peaks, np, plt):
+def _(dissoss, find_peaks, np, plt, prepare_sweep):
     n_harmonics = 20
-    harmonics = np.arange(1, n_harmonics + 1)
+    f1 = 440.0
+    harmonics = f1 * np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
-    f1 = 440.0
-
-    # 0.5 cent steps
-    num = 2600
-    cents_sweep = np.linspace(0, num // 2, num)
-
-    # axis 0: different frequency ratios
-    # axis 1: different harmonics
-    # all combinations of f1 * harmonics and f2 * harmonics
-    f2 = f1 * 2 ** (cents_sweep / 1200)
-    all_spec2s = f2[:, None] * harmonics[None, :]
-    # match the dimension of harmonics b ystacking num of them at axis 0
-    spec1s = np.tile(f1 * harmonics[None, :], (num, 1))
-    # same for amps
-    all_amps = np.tile(amps[None, :], (num, 1))
-    all_spekis = np.concatenate([spec1s, all_spec2s], axis=1)
-    all_ampiks = np.concatenate([all_amps, all_amps], axis=1)
-    ia, ja = np.triu_indices(all_spekis.shape[1], k=1)
-    # TODO: use ordered pairs. this way we'll do the calculations in units of both lower and
-    # higher frequency's critical band widths
-    left_spekis = all_spekis[:, ia]
-    right_spekis = all_spekis[:, ja]
-    left_ampiks = all_ampiks[:, ia]
-    right_ampiks = all_ampiks[:, ja]
-    curve = np.sum(
-        diso(left_spekis, right_spekis, left_ampiks, right_ampiks), axis=1
+    pairs_spekis, pairs_ampiks, x_axis = prepare_sweep(
+        f1, harmonics, amps, f1, harmonics, amps, 0, 1300, 1
     )
+    curve = dissoss(pairs_spekis, pairs_ampiks, model="min")
 
     curve -= curve.min()
     curve /= curve.max()
 
-    # xpeaks, xprops = find_peaks(-curve, prominence=0.15)
-
-    xx = cents_sweep
-
     plt.figure(figsize=(11, 3), constrained_layout=True)
-    plt.plot(xx, curve)
-    # plt.plot(xx, 10 * np.gradient(curve, xx), color="gray")
-    # TODO: find peaks of the second derivative instead
-    ddcurve = np.gradient(np.gradient(curve, xx), xx)
+    plt.plot(x_axis, curve)
+
+    ddcurve = np.gradient(np.gradient(curve, x_axis), x_axis)
     ddcurve /= ddcurve.max()
-    plt.plot(xx, ddcurve, color="green", alpha=0.6)
-    # plt.plot(xx, 100 * np.gradient(curve, xx), color="green")
+
+    plt.plot(x_axis, ddcurve, color="green", alpha=0.6)
+
     dpeaks, dprops = find_peaks(ddcurve, height=0.2)
-    plt.plot(xx[dpeaks], curve[dpeaks], "ro", label="minima")
-    # plt.plot(xx[xpeaks], curve[xpeaks], "ro", label="minima")
-    # plt.xscale("log")
-    # plt.xlim(1, 2.3)
+    plt.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
 
     plt.xlabel("frequency ratio")
     plt.ylabel("sensory dissonance")
 
     # 1) draw vertical dashed lines at each minima
-    for xii in xx[dpeaks]:
+    for xii in x_axis[dpeaks]:
         plt.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
 
     plt.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
@@ -314,27 +288,22 @@ def _(diso, find_peaks, np, plt):
     # 2) add ticks at those x‐positions and label them with their numerical values
     plt.minorticks_off()
     plt.xticks(
-        xx[dpeaks], format_list := [f"{int(np.round(t))}" for t in xx[dpeaks]]
+        x_axis[dpeaks],
+        format_list := [f"{int(np.round(t))}" for t in x_axis[dpeaks]],
     )
 
     plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
 
     plt.gcf()
-    return curve, dpeaks, dprops, f1, f2, xx
+    return dpeaks, dprops, x_axis
 
 
 @app.cell
-def _(curve, f1, f2):
-    curve[0], f1, f2[0]
-    return
-
-
-@app.cell
-def _(dpeaks, dprops, np, xx):
+def _(dpeaks, dprops, np, x_axis):
     heights = dprops["peak_heights"]
     order = np.argsort(heights)[::-1]
 
-    np.round(xx[dpeaks][order])
+    np.round(x_axis[dpeaks][order])
     return
 
 

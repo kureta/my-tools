@@ -7,19 +7,76 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def get_critical_bandwidth(f):
-    cbw = 25 + 75 * (1 + 1.4 * (f / 1000) ** 2) ** 0.69
-    return cbw
+def dissoss(fvec, amp, model="min"):
+    """
+    Given a list of partials in fvec, with amplitudes in amp, this routine
+    calculates the dissonance by summing the roughness of every sine pair
+    based on a model of Plomp-Levelt's roughness curve.
+    The older model (model='product') was based on the product of the two
+    amplitudes, but the newer model (model='min') is based on the minimum
+    of the two amplitudes, since this matches the beat frequency amplitude.
+    """
+
+    # Used to stretch dissonance curve for different freqs:
+    Dstar = 0.24  # Point of maximum dissonance
+    S1 = 0.0207
+    S2 = 18.96
+
+    C1 = 5
+    C2 = -5
+
+    # Plomp-Levelt roughness curve:
+    A1 = -3.51
+    A2 = -5.75
+
+    Fmin = np.min(fvec, axis=-1)
+    S = Dstar / (S1 * Fmin + S2)
+    Fdif = np.max(fvec, axis=-1) - np.min(fvec, axis=-1)
+
+    if model == "min":
+        a = np.amin(amp, axis=-1)
+    elif model == "product":
+        a = np.prod(amp, axis=-1)  # Older model
+    else:
+        raise ValueError('model should be "min" or "product"')
+    SFdif = S * Fdif
+    D = np.sum(a * (C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)), axis=-1)
+
+    return D
 
 
-def diso(f0, f1, a0, a1):
-    cbw = get_critical_bandwidth(np.minimum(f0, f1))
-    abs_delta_cbw = np.abs(f1 - f0) / cbw
-    plomp = 4 * abs_delta_cbw
-    plomp *= np.exp(1 - 4 * abs_delta_cbw)
-    plomp *= np.minimum(a0, a1)
+def prepare_sweep(
+    f0,
+    spectrum0,
+    amp0,
+    f1,
+    spectrum1,
+    amp1,
+    start_cents=0,
+    end_cents=1200,
+    resolution_cents=1.0,
+):
+    n_points = int(np.round((end_cents - start_cents) / resolution_cents))
+    # End point excluded to easily concatenate curves
+    cents_sweep = np.linspace(start_cents, end_cents, n_points, endpoint=False)
 
-    return plomp
+    tiled_spectrum0 = np.tile(spectrum0[None, :], (n_points, 1))
+    tiled_amp0 = np.tile(amp0[None, :], (n_points, 1))
+
+    swept_f1 = f0 * 2 ** (cents_sweep / 1200)
+    normalized_spectrum1 = spectrum1 / f1
+    swept_spectrum1 = swept_f1[:, None] * normalized_spectrum1[None, :]
+    tiled_amp1 = np.tile(amp1[None, :], (n_points, 1))
+
+    entire_spectrum = np.concatenate([tiled_spectrum0, swept_spectrum1], axis=1)
+    entire_amps = np.concatenate([tiled_amp0, tiled_amp1], axis=1)
+
+    i, j = np.triu_indices(entire_spectrum.shape[1], k=1)
+    idx = np.stack((i, j), axis=1)
+    bin_pairs = entire_spectrum[:, idx]
+    amp_pairs = entire_amps[:, idx]
+
+    return bin_pairs, amp_pairs, cents_sweep
 
 
 def dissmeasure(fvec, amp, model="min"):
