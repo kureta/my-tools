@@ -15,8 +15,8 @@ def get_critical_bandwidth(f):
 def diso(f0, f1, a0, a1):
     cbw = get_critical_bandwidth(np.minimum(f0, f1))
     abs_delta_cbw = np.abs(f1 - f0) / cbw
-    plomp = k * abs_delta_cbw
-    plomp *= np.exp(1 - k * abs_delta_cbw)
+    plomp = 4 * abs_delta_cbw
+    plomp *= np.exp(1 - 4 * abs_delta_cbw)
     # TODO: minimum or product of amplitudes.
     # plomp *= a0 * a1
     plomp *= np.minimum(a0, a1)
