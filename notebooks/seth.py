@@ -10,21 +10,22 @@ def _():
 
     import marimo as mo
     import matplotlib.pyplot as plt
+    from matplotlib.figure import Figure
 
     import numpy as np
     from scipy.signal import find_peaks
 
     import librosa
 
-    from my_tools.seth import dissmeasure, plot_this, dissoss, prepare_sweep
+    from my_tools.seth import dissonance, prepare_sweep, plot_curve, get_peaks
     return (
-        dissmeasure,
-        dissoss,
+        dissonance,
         find_peaks,
+        get_peaks,
         librosa,
         mo,
         np,
-        plot_this,
+        plot_curve,
         plt,
         prepare_sweep,
     )
@@ -119,77 +120,39 @@ def _(
     cello_fs,
     cello_mags,
     cello_peaks,
-    dissmeasure,
-    find_peaks,
+    dissonance,
     fs,
+    get_peaks,
     mags,
     np,
-    plt,
+    plot_curve,
+    prepare_sweep,
     tamtam_peaks,
 ):
     freq1 = fs[tamtam_peaks]
     amp1 = mags[tamtam_peaks]
     f0 = fs[tamtam_peaks][0]
-    freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
     amp2 = cello_mags[cello_peaks]
 
-    r_low = 1.0
-    alpharange = 2.1
-    method = "min"
+    bin_pairs, amp_pairs, cents = prepare_sweep(
+        f0,
+        freq1,
+        amp1,
+        cello_fs[cello_peaks][0],
+        cello_fs[cello_peaks],
+        amp2,
+        0,
+        1300,
+        1,
+    )
+    # calculate dissonance curve
+    dissonance_curve = dissonance(bin_pairs, amp_pairs, model="min")
 
-    n = 3000
-    diss = np.empty(n)
-    a = np.concatenate((amp1, amp2))
-    for i, alpha in enumerate(np.linspace(r_low, alpharange, n)):
-        f = np.concatenate((freq1, alpha * freq2))
-        d = dissmeasure(f, a, method)
-        diss[i] = d
-
-    # 2) find local minima: a point i is a local minimum if y[i-1] > y[i] < y[i+1]
-    #    so we look for sign changes in the discrete derivative
-    peaks, props = find_peaks(-diss, prominence=0.15)
-
-    x = np.linspace(r_low, alpharange, len(diss))
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(x, diss)
-    plt.plot(x[peaks], diss[peaks], "ro", label="minima")
-    plt.xscale("log")
-    plt.xlim(r_low, alpharange)
-
-    plt.xlabel("frequency ratio")
-    plt.ylabel("sensory dissonance")
-
-    # 1) draw vertical dashed lines at each minima
-    for xi in x[peaks]:
-        plt.axvline(x=xi, color="b", linestyle="-", alpha=0.3)
-
-    plt.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
-
-    # 2) add ticks at those x‐positions and label them with their numerical values
-    plt.minorticks_off()
-    plt.xticks(x[peaks], [f"{int(np.round(t))}" for t in np.log2(x[peaks]) * 1200])
-
-    plt.tight_layout()
-    plt.gca()
-    return peaks, x
-
-
-@app.cell
-def _(np, peaks, x):
-    [f"{int(np.round(t))}" for t in np.log2(x[peaks]) * 1200]
-    return
-
-
-@app.cell
-def _(fs, librosa, peaks, tamtam_peaks, x):
-    print(librosa.hz_to_midi(fs[tamtam_peaks][1]))
-    print()
-
-    for ratio in x[peaks]:
-        hz = fs[tamtam_peaks][0] * ratio
-        midi = librosa.hz_to_midi(hz) - librosa.hz_to_midi(fs[tamtam_peaks][0])
-        print(midi)
+    # find peaks in the dissonance curve
+    height = 0.70
+    print(np.round(get_peaks(cents, dissonance_curve, height=height)).astype(int))
+    #  and plot the curve with the peaks marked
+    plot_curve(cents, dissonance_curve, height=height)
     return
 
 
@@ -198,7 +161,7 @@ def generate_scale(generator, octave, length):
     tmp = 0
     scale = []
 
-    for idx in range(length - 1):
+    for _ in range(length - 1):
         tmp = (tmp + generator) % octave
         scale.append(tmp)
 
@@ -209,34 +172,10 @@ def generate_scale(generator, octave, length):
 
 @app.cell
 def _():
-    # 12-EDO for 1.05
-    asd = []
-    current = 0
-    for _ in range(12):
-        current = (current + 735) % 1260
-        asd.append(current)
-
-    asd.sort()
-    print(asd)
-    return
-
-
-@app.cell
-def _():
     # Pythagorian for 1.05
     print(generate_scale(737, 1260, 12))
-    return
-
-
-@app.cell
-def _():
     # Pythagorian for 0.95
     print(generate_scale(667, 1140, 12))
-    return
-
-
-@app.cell
-def _():
     # Tamtam
     print(generate_scale(291, 1207, 12))
     return
@@ -244,155 +183,42 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""## My attempt at a cleaner and faster version of the dissonance curve calculation"""
-    )
+    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
     return
 
 
 @app.cell
-def _(dissoss, find_peaks, np, plt, prepare_sweep):
+def _(dissonance, get_peaks, np, plot_curve, prepare_sweep):
+    # prepare partials
     n_harmonics = 20
     f1 = 440.0
     harmonics = f1 * np.arange(1, n_harmonics + 1)
     amps = 0.88 ** np.arange(0, n_harmonics)
 
+    # lolo
+    # freq1 = fs[tamtam_peaks]
+    # amp1 = mags[tamtam_peaks]
+    # f0 = fs[tamtam_peaks][0]
+    # freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
+    # amp2 = cello_mags[cello_peaks]
+    # pairs_spekis, pairs_ampiks, x_axis = prepare_sweep(
+    #     f0, freq1, amp1, cello_fs[cello_peaks][0], cello_fs[cello_peaks], amp2, 0, 1300, 1
+    # )
+    # dbs = librosa.amplitude_to_db(amps, ref=1.0, amin=1e-10, top_db=None)
+    # dbs -= dbs.min()
+    # dbs += librosa.A_weighting(harmonics)
+    # prepare vectorized pairs of partials
     pairs_spekis, pairs_ampiks, x_axis = prepare_sweep(
         f1, harmonics, amps, f1, harmonics, amps, 0, 1300, 1
     )
-    curve = dissoss(pairs_spekis, pairs_ampiks, model="min")
+    # calculate dissonance curve
+    curve = dissonance(pairs_spekis, pairs_ampiks, model="min")
 
-    curve -= curve.min()
-    curve /= curve.max()
-
-    plt.figure(figsize=(11, 3), constrained_layout=True)
-    plt.plot(x_axis, curve)
-
-    ddcurve = np.gradient(np.gradient(curve, x_axis), x_axis)
-    ddcurve /= ddcurve.max()
-
-    plt.plot(x_axis, ddcurve, color="green", alpha=0.6)
-
-    dpeaks, dprops = find_peaks(ddcurve, height=0.2)
-    plt.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
-
-    plt.xlabel("frequency ratio")
-    plt.ylabel("sensory dissonance")
-
-    # 1) draw vertical dashed lines at each minima
-    for xii in x_axis[dpeaks]:
-        plt.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
-
-    plt.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
-
-    # 2) add ticks at those x‐positions and label them with their numerical values
-    plt.minorticks_off()
-    plt.xticks(
-        x_axis[dpeaks],
-        format_list := [f"{int(np.round(t))}" for t in x_axis[dpeaks]],
-    )
-
-    plt.gca().tick_params(axis="x", rotation=45, labelsize=8)
-
-    plt.gcf()
-    return dpeaks, dprops, x_axis
-
-
-@app.cell
-def _(dpeaks, dprops, np, x_axis):
-    heights = dprops["peak_heights"]
-    order = np.argsort(heights)[::-1]
-
-    np.round(x_axis[dpeaks][order])
-    return
-
-
-@app.cell
-def _(plot_this):
-    plot_this()
-    return
-
-
-@app.cell
-def _():
-    import utils.plot_helpers as ph
-    return (ph,)
-
-
-@app.cell
-def _(ph):
-    ph.simple_plot()
-    return
-
-
-@app.cell
-def _(ph):
-    ph.dual_xaxis_plot()
-    return
-
-
-@app.cell
-def _(ph):
-    ph.grid_plot()
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(
-        r"""
-    The roughness R of a signal whose spectrum has two sinusoidal components with frequencies f1, f2 and amplitudes A1, A2, where fmin = min(f1, f2),  fmax = max(f1, f2),  Amin = min(A1, A2),  Amax = max(A1, A2), is:
-
-       R = X0.1*0.5(Y3.11)*Z      where
-
-           X = Amin*Amax
-           The term X0.1 represents the dependence of roughness on intensity (related to the amplitude of the added sines). It is based on Terhardt (1974), adjusted (Vassilakis, 2000, 2001) to account for the quantitative difference between modulation depth (used in Terhardt, 1974) and amplitude fluctuation degree (the signal parameter influencing roughness). 
-
-           Y = 2Amin / (Amin+Amax )
-           The term Y3.11 represents the dependence of roughness on amplitude fluctuation degree (related to the amplitude difference of the added sines). It, too, is based on Terhard (1974), adjusted (Vassilakis, 2000, 2001) to account for the quantitative difference between modulation depth and amplitude fluctuation degree.
-
-           Z = e-b1s(fmax - fmin) - e-b2s(fmax - fmin), 
-           [b1 = 3.5;  b2 = 5.75;  s = 0.24/(s1fmin + s2);  s1 = 0.0207;  s2 = 18.96]
-           The term Z represents the dependence of roughness on amplitude fluctuation rate (frequency difference of the added sines) and register (frequency of the lower sine). It is based on Sethares's (1998) modeling of the roughness curves in Figure 1, below, curves that have been derived from multiple perceptual experiments examining the roughness of pairs of sines (Plomp & Levelt, 1965; Kameoka & Kuriyagawa, 1969a&b).
-    """
-    )
-    return
-
-
-@app.cell
-def _(np):
-    def roughness(f1, f2, a1, a2):
-        amin = np.minimum(a1, a2)
-        amax = np.maximum(a1, a2)
-        fmin = np.minimum(f1, f2)
-        fmax = np.maximum(f1, f2)
-        x = amax * amin
-        y = 2 * amin / (amin + amax)
-        b1 = 3.5
-        b2 = 5.75
-        s1 = 0.0207
-        s2 = 18.9
-        s = 0.24 / (s1 * fmin + s2)
-        z = np.exp(-b1 * s * (fmax - fmin)) - np.exp(-b2 * s * (fmax - fmin))
-        r = (x**0.1) * 0.5 * (y**3.11) * z
-
-        return r
-    return (roughness,)
-
-
-@app.cell
-def _(np, plt, roughness):
-    start_f = 110
-    sweep_factor = np.linspace(1, 2.3, 1000)
-    plt.plot(sweep_factor, roughness(start_f, start_f * sweep_factor, 1.0, 1.0))
-    return (sweep_factor,)
-
-
-@app.cell
-def _(np, plt, roughness, sweep_factor):
-    start_f1 = 880
-    sweep_factor1 = np.linspace(1, 2.3, 1000)
-    plt.plot(sweep_factor, roughness(start_f1, start_f1 * sweep_factor1, 1.0, 1.0))
+    # find peaks in the dissonance curve
+    k = 0.25
+    print(get_peaks(x_axis, curve, height=k))
+    #  and plot the curve with the peaks marked
+    plot_curve(x_axis, curve, height=k)
     return
 
 
