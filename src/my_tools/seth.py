@@ -99,6 +99,8 @@ def get_peaks(x_axis, curve, height=0.2):
 
 
 def plot_curve(x_axis, curve, d2curve, dpeaks, fig):
+    fig.clear()
+
     ax1 = fig.add_axes((0.1, 0.15, 0.8, 0.8))
     ax2 = ax1.twinx()
 
