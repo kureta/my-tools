@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from nicegui import ui
+import librosa
 
 from my_tools.seth import (
     dissonance,
@@ -16,12 +17,16 @@ from my_tools.seth import (
 @dataclass
 class Config:
     n_harmonics = 8
-    f1 = 330
+    midi1 = 60
     f2 = 440
     amp_decay = 0.88
     start_delta_cents = 0
     delta_cents_range = 1300
     peak_cutoff = 0.2
+
+    @property
+    def f1(self):
+        return librosa.midi_to_hz(self.midi1)
 
 
 conf = Config()
@@ -69,16 +74,16 @@ with ui.row():
         with ui.card():
             slider = (
                 ui.slider(
-                    min=27.5,
-                    max=4186.01,
+                    min=21,
+                    max=108,
                     step=1,
                     on_change=lambda e: show_plot(),
                 )
                 .classes("w-96")
-                .bind_value(conf, "f1")
+                .bind_value(conf, "midi1")
             )
             with ui.row():
-                ui.label("base frequency:")
+                ui.label("base midi #:")
                 ui.label("").bind_text(slider, "value")
 
         with ui.card():
@@ -116,7 +121,7 @@ with ui.row():
                 ui.slider(
                     min=0,
                     max=2400,
-                    step=1,
+                    step=100,
                     on_change=lambda e: show_plot(),
                 )
                 .classes("w-96")
@@ -131,7 +136,7 @@ with ui.row():
                 ui.slider(
                     min=1200,
                     max=2600,
-                    step=1,
+                    step=100,
                     on_change=lambda e: show_plot(),
                 )
                 .classes("w-96")
