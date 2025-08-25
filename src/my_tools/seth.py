@@ -85,6 +85,10 @@ def prepare_sweep(
     return bin_pairs, amp_pairs, cents_sweep
 
 
+# TODO: Use a combination of the 2nd derivative and dissonance value.
+# Higher octaves are more consonant than lower octaves but they are
+# not selected because their 2nd derivaties are relatively smaller
+# but their dissonance values are way lower.
 def get_peaks(x_axis, curve, height=0.2):
     second_derivative = np.gradient(np.gradient(curve, x_axis), x_axis)
     second_derivative -= second_derivative.min()
@@ -98,7 +102,7 @@ def get_peaks(x_axis, curve, height=0.2):
 def plot_curve(x_axis, curve, d2curve, dpeaks, fig):
     fig.clear()
 
-    ax1 = fig.add_axes((0.1, 0.15, 0.8, 0.8))
+    ax1 = fig.add_axes((0.05, 0.15, 0.9, 0.8))
     ax2 = ax1.twinx()
 
     ax1.plot(x_axis, curve, color="blue")

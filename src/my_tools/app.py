@@ -21,6 +21,7 @@ class Config:
     start_delta_cents = 0
     delta_cents_range = 1300
     peak_cutoff = 0.2
+    method = "min"
 
     @property
     def f1(self):
@@ -49,7 +50,7 @@ def show_plot():
         conf.start_delta_cents + conf.delta_cents_range,
     )
 
-    curve = dissonance(overtone_pairs, amplitude_pairs)
+    curve = dissonance(overtone_pairs, amplitude_pairs, conf.method)
     peaks, d2curve = get_peaks(cents, curve, height=conf.peak_cutoff)
 
     # we can just call fig.update() after plot_curve instead of using the context manager
@@ -60,42 +61,56 @@ def show_plot():
 
 
 def create_slider(min, max, step, on_change, value, label):
-    with ui.card():
-        ui.slider(
-            min=min,
-            max=max,
-            step=step,
-            on_change=on_change,
-        ).classes(
-            "w-96"
-        ).bind_value(conf, value)
-        with ui.row():
-            ui.label(label)
-            ui.label("").bind_text(conf, value)
+    with ui.row():
+        ui.label(label)
+        ui.label("").bind_text(conf, value)
+    ui.slider(
+        min=min,
+        max=max,
+        step=step,
+        on_change=on_change,
+    ).classes(
+        "w-96"
+    ).bind_value(conf, value)
 
 
 # ======= GUI Code =======
 
 with ui.row():
     with ui.column():
-        ui.markdown("## Thesis")
-        ui.markdown("A presentation page for my masters thesis proposal.")
+        ui.markdown("## Control Parameters")
 
-        create_slider(21, 108, 1, show_plot, "midi1", "base midi #:")
-        create_slider(1, 32, 1, show_plot, "n_harmonics", "number of partials:")
-        create_slider(0, 1, 0.01, show_plot, "amp_decay", "amplitude decay:")
-        create_slider(
-            0, 2400, 100, show_plot, "start_delta_cents", "start interval (cents)"
-        )
-        create_slider(
-            1200, 2600, 100, show_plot, "delta_cents_range", "interval range (cents)"
-        )
-        create_slider(0, 1, 0.01, show_plot, "peak_cutoff", "peak cutoff:")
+        with ui.card():
+            ui.markdown("**Parameters of synthetic partials**")
+            ui.separator()
+            create_slider(21, 108, 1, show_plot, "midi1", "base midi #:")
+            create_slider(1, 32, 1, show_plot, "n_harmonics", "number of partials:")
+            create_slider(0, 1, 0.01, show_plot, "amp_decay", "amplitude decay:")
+        with ui.card():
+            ui.markdown("**Parameters of dissonance curve calculation**")
+            ui.separator()
+            with ui.row():
+                ui.label("Calculation method:")
+                ui.select(
+                    ["min", "product"], value="min", on_change=show_plot
+                ).bind_value(conf, "method")
+            create_slider(
+                0, 2400, 100, show_plot, "start_delta_cents", "start interval (cents)"
+            )
+            create_slider(
+                1200,
+                2600,
+                100,
+                show_plot,
+                "delta_cents_range",
+                "interval range (cents)",
+            )
+            create_slider(0, 1, 0.01, show_plot, "peak_cutoff", "peak cutoff:")
 
     with ui.column():
         ui.markdown("## Synthetic spectra")
         with ui.card():
-            with ui.matplotlib(figsize=(12, 4), dpi=300).figure as fig:
+            with ui.matplotlib(figsize=(14, 4)).figure as fig:
                 show_plot()
 
 ui.run()
