@@ -1,15 +1,11 @@
-# pyright: basic
-
 """
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
 import numpy as np
 from scipy.signal import find_peaks
 
 
-def get_harmonic_spectrum(f0=440, n_harmonics=20, decay=0.88):
+def get_harmonic_spectrum(f0=440.0, n_harmonics=20, decay=0.88):
     harmonics = f0 * np.arange(1, n_harmonics + 1)
     amplitudes = decay ** np.arange(0, n_harmonics)
 

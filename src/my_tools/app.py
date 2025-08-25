@@ -1,17 +1,10 @@
-# pyright: basic
-
 from dataclasses import dataclass
 
-from nicegui import ui
 import librosa
+from nicegui import ui
 
-from my_tools.seth import (
-    dissonance,
-    get_harmonic_spectrum,
-    get_peaks,
-    plot_curve,
-    prepare_sweep,
-)
+from my_tools.seth import (dissonance, get_harmonic_spectrum, get_peaks,
+                           plot_curve, prepare_sweep)
 
 
 @dataclass
@@ -54,9 +47,9 @@ def show_plot():
     curve = dissonance(overtone_pairs, amplitude_pairs)
     peaks, d2curve = get_peaks(cents, curve, height=conf.peak_cutoff)
 
-    plot_curve(cents, curve, d2curve, peaks, fig)
-    fig.canvas.draw_idle()
-    fig.element.update()
+    # we can just call fig.update() after plot_curve instead of using the context manager
+    with fig:
+        plot_curve(cents, curve, d2curve, peaks, fig)
 
     return fig
 
