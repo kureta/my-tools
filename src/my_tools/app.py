@@ -3,8 +3,13 @@ from dataclasses import dataclass
 import librosa
 from nicegui import ui
 
-from my_tools.seth import (dissonance, get_harmonic_spectrum, get_peaks,
-                           plot_curve, prepare_sweep)
+from my_tools.seth import (
+    dissonance,
+    get_harmonic_spectrum,
+    get_peaks,
+    plot_curve,
+    prepare_sweep,
+)
 
 
 @dataclass
@@ -54,105 +59,38 @@ def show_plot():
     return fig
 
 
+def create_slider(min, max, step, on_change, value, label):
+    with ui.card():
+        ui.slider(
+            min=min,
+            max=max,
+            step=step,
+            on_change=on_change,
+        ).classes(
+            "w-96"
+        ).bind_value(conf, value)
+        with ui.row():
+            ui.label(label)
+            ui.label("").bind_text(conf, value)
+
+
 # ======= GUI Code =======
 
 with ui.row():
     with ui.column():
-        ui.markdown(
-            """## Thesis
+        ui.markdown("## Thesis")
+        ui.markdown("A presentation page for my masters thesis proposal.")
 
-    A presentation page for my masters thesis proposal.
-    """
+        create_slider(21, 108, 1, show_plot, "midi1", "base midi #:")
+        create_slider(1, 32, 1, show_plot, "n_harmonics", "number of partials:")
+        create_slider(0, 1, 0.01, show_plot, "amp_decay", "amplitude decay:")
+        create_slider(
+            0, 2400, 100, show_plot, "start_delta_cents", "start interval (cents)"
         )
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=21,
-                    max=108,
-                    step=1,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "midi1")
-            )
-            with ui.row():
-                ui.label("base midi #:")
-                ui.label("").bind_text(slider, "value")
-
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=1,
-                    max=32,
-                    step=1,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "n_harmonics")
-            )
-            with ui.row():
-                ui.label("number of partials:")
-                ui.label("").bind_text(slider, "value")
-
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=0,
-                    max=1,
-                    step=0.01,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "amp_decay")
-            )
-            with ui.row():
-                ui.label("amplitude decay:")
-                ui.label("").bind_text(slider, "value")
-
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=0,
-                    max=2400,
-                    step=100,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "start_delta_cents")
-            )
-            with ui.row():
-                ui.label("start interval (cents)")
-                ui.label("").bind_text(slider, "value")
-
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=1200,
-                    max=2600,
-                    step=100,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "delta_cents_range")
-            )
-            with ui.row():
-                ui.label("interval range (cents):")
-                ui.label("").bind_text(slider, "value")
-
-        with ui.card():
-            slider = (
-                ui.slider(
-                    min=0,
-                    max=1,
-                    step=0.01,
-                    on_change=lambda e: show_plot(),
-                )
-                .classes("w-96")
-                .bind_value(conf, "peak_cutoff")
-            )
-            with ui.row():
-                ui.label("peak cutoff:")
-                ui.label("").bind_text(slider, "value")
+        create_slider(
+            1200, 2600, 100, show_plot, "delta_cents_range", "interval range (cents)"
+        )
+        create_slider(0, 1, 0.01, show_plot, "peak_cutoff", "peak cutoff:")
 
     with ui.column():
         ui.markdown("## Synthetic spectra")

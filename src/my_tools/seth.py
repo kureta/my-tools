@@ -1,6 +1,7 @@
 """
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
+
 import numpy as np
 from scipy.signal import find_peaks
 
