@@ -22,6 +22,7 @@ class Config:
     delta_cents_range = 1300
     peak_cutoff = 0.2
     method = "min"
+    n_peaks = 0
 
     @property
     def f1(self):
@@ -52,6 +53,7 @@ def show_plot():
 
     curve = dissonance(overtone_pairs, amplitude_pairs, conf.method)
     peaks, d2curve = get_peaks(cents, curve, height=conf.peak_cutoff)
+    conf.n_peaks = len(peaks)
 
     # we can just call fig.update() after plot_curve instead of using the context manager
     with fig:
@@ -110,6 +112,9 @@ with ui.row():
     with ui.column():
         ui.markdown("## Synthetic spectra")
         with ui.card():
+            with ui.row():
+                ui.label("n peaks detected:")
+                ui.label("").bind_text(conf, "n_peaks")
             with ui.matplotlib(figsize=(14, 4)).figure as fig:
                 show_plot()
 
