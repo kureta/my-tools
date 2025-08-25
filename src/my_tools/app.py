@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import librosa
 from nicegui import ui
 
+from my_tools.file_picker import local_file_picker
 from my_tools.seth import (
     dissonance,
     get_harmonic_spectrum,
@@ -23,6 +24,7 @@ class Config:
     peak_cutoff = 0.2
     method = "min"
     n_peaks = 0
+    audio_path = ""
 
     @property
     def f1(self):
@@ -30,6 +32,12 @@ class Config:
 
 
 conf = Config()
+
+
+async def pick_file():
+    result = (await local_file_picker("~"))[0]
+    conf.audio_path = result
+    ui.notify(f"You chose {result}")
 
 
 def show_plot():
@@ -81,6 +89,10 @@ def create_slider(min, max, step, on_change, value, label):
 with ui.row():
     with ui.column():
         ui.markdown("## Control Parameters")
+        ui.button("Choose lower voice", on_click=pick_file, icon="folder")
+        ui.audio(
+            "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
+        ).bind_source_from(conf, "audio_path")
 
         with ui.card():
             ui.markdown("**Parameters of synthetic partials**")
