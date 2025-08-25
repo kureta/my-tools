@@ -14,8 +14,8 @@ from my_tools.seth import (
 
 @dataclass
 class Config:
-    n_harmonics = 8
-    midi1 = 60
+    n_harmonics = 20
+    midi1 = 69
     f2 = 440
     amp_decay = 0.88
     start_delta_cents = 0
