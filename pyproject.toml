@@ -1,33 +1,40 @@
+[build-system]
+build-backend = "hatchling.build"
+
+requires = [ "hatchling" ]
+
 [project]
 name = "my-tools"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [{ name = "kureta", email = "skureta@gmail.com" }]
+authors = [ { name = "kureta", email = "skureta@gmail.com" } ]
 requires-python = ">=3.13"
+classifiers = [ "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python :: 3.13" ]
 dependencies = [
-  "librosa>=0.11.0",
+  "librosa>=0.11",
   "marimo[lsp]>=0.11.21",
   "matplotlib>=3.9.4",
   "mido>=1.3.3",
-  "nicegui>=2.23.0",
-  "numba>=0.60.0",
+  "nicegui>=2.23",
+  "numba>=0.60",
   "numpy>=2.0.2",
-  "plotly>=6.3.0",
+  "plotly>=6.3",
   "polars>=1.25.2",
   "ssqueezepy>=0.6.5",
-  "torch>=2.6.0",
-  "torchaudio>=2.6.0",
-  "torchvision>=0.21.0",
-  "watchdog>=6.0.0",
+  "torch>=2.6",
+  "torchaudio>=2.6",
+  "torchvision>=0.21",
+  "watchdog>=6",
 ]
 
-[project.scripts]
-my-tools = "my_tools:main"
+scripts.my-tools = "my_tools:app"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[dependency-groups]
+dev = [
+  "pynvim>=0.5.2",
+  "watchdog>=6",
+]
 
 [tool.marimo.runtime]
 output_max_bytes = 100_000_000
@@ -35,12 +42,3 @@ watcher_on_save = "autorun"
 
 [tool.marimo.experimental]
 lsp = true
-
-[dependency-groups]
-dev = [
-    "basedpyright>=1.31.3",
-    "debugpy>=1.8.14",
-    "pynvim>=0.5.2",
-    "ty>=0.0.1a19",
-    "watchdog>=6.0.0",
-]
