@@ -1,4 +1,4 @@
-from my_tools.page_one.state import Config
+from my_tools.page_one.state import state
 from my_tools.seth import (
     dissonance,
     get_harmonic_spectrum,
@@ -7,34 +7,32 @@ from my_tools.seth import (
     prepare_sweep,
 )
 
-conf = Config()
-
 
 # TODO: separate plotting and calculation
 def show_plot():
-    if not conf.has_figure():
+    if not state.has_figure():
         return
     spectrum_1, amplitudes_1 = get_harmonic_spectrum(
-        conf.f1, conf.n_harmonics, conf.amp_decay  # pyright: ignore
+        state.f1, state.n_harmonics, state.amp_decay  # pyright: ignore
     )
     spectrum_2, amplitudes_2 = get_harmonic_spectrum(
-        conf.f2, conf.n_harmonics, conf.amp_decay
+        state.f2, state.n_harmonics, state.amp_decay
     )
 
     overtone_pairs, amplitude_pairs, cents = prepare_sweep(
-        conf.f1,
+        state.f1,
         spectrum_1,
         amplitudes_1,
-        conf.f2,
+        state.f2,
         spectrum_2,
         amplitudes_2,
-        conf.start_delta_cents,
-        conf.start_delta_cents + conf.delta_cents_range,
+        state.start_delta_cents,
+        state.start_delta_cents + state.delta_cents_range,
     )
 
-    curve = dissonance(overtone_pairs, amplitude_pairs, conf.method)
-    peaks, d2curve = get_peaks(cents, curve, height=conf.peak_cutoff)
-    conf.n_peaks = len(peaks)
+    curve = dissonance(overtone_pairs, amplitude_pairs, state.method)
+    peaks, d2curve = get_peaks(cents, curve, height=state.peak_cutoff)
+    state.n_peaks = len(peaks)
 
-    plot_curve(cents, curve, d2curve, peaks, conf.figure)
-    conf.figure.element.update()
+    plot_curve(cents, curve, d2curve, peaks, state.figure)
+    state.figure.element.update()

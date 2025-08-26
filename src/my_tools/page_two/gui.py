@@ -1,9 +1,9 @@
 from nicegui import ui
 
-from my_tools.page_two.state import Config
+from my_tools.page_two.state import State
 from my_tools.tools.file_picker import local_file_picker
 
-conf = Config()
+conf = State()
 
 
 async def pick_file():

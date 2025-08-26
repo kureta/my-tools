@@ -4,9 +4,9 @@ import librosa
 from nicegui.elements.pyplot import MatplotlibFigure
 
 
-# TODO: move all values to State (rename Config to State)
+# TODO: state and logic are too coupled
 @dataclass
-class Config:
+class State:
     n_harmonics = 20
     midi1 = 69
     f2 = 440
@@ -24,3 +24,6 @@ class Config:
 
     def has_figure(self):
         return self.__dict__.get("figure") and self.figure is not None
+
+
+state = State()

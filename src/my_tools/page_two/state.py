@@ -1,9 +1,8 @@
 from dataclasses import dataclass
 
 
-# TODO: move all values to State (rename Config to State)
 @dataclass
-class Config:
+class State:
     audio_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
 
     # TODO: this is a hack. get proper file name
@@ -12,4 +11,4 @@ class Config:
         return self.audio_path.split("/")[-1]
 
 
-conf = Config()
+state = State()
