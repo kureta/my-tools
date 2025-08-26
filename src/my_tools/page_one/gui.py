@@ -1,8 +1,10 @@
 from nicegui import ui
 
-from my_tools.logic import conf, pick_file, show_plot
+from my_tools.page_one.logic import conf, show_plot
 
 
+# TODO: refactor out dissonance cirve calculation controls and
+#       dissonance curve display as reusable ui components
 def create_slider(min, max, step, on_change, value, label):
     with ui.row():
         ui.label(label)
@@ -15,9 +17,6 @@ def create_slider(min, max, step, on_change, value, label):
     ).classes(
         "w-96"
     ).bind_value(conf, value)
-
-
-# ======= GUI Code =======
 
 
 def create_page_one():
