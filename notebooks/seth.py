@@ -187,9 +187,7 @@ def _():
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(
-        r"""## My attempt at a cleaner and faster version of the dissonance curve calculation"""
-    )
+    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
     return
 
 
