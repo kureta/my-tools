@@ -91,8 +91,11 @@ def prepare_sweep(
 # but their dissonance values are way lower.
 def get_peaks(x_axis, curve, height=0.2):
     second_derivative = np.gradient(np.gradient(curve, x_axis), x_axis)
+    # second_derivative /= curve
     second_derivative -= second_derivative.min()
     second_derivative /= second_derivative.max()
+    # second_derivative = np.log(second_derivative) + 3.1
+    # second_derivative /= 3.1
 
     dpeaks, _ = find_peaks(second_derivative, height=height)
 
