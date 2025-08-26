@@ -23,7 +23,6 @@ def create_slider(min, max, step, on_change, value, label):
 def create_page_one():
     with ui.row():
         with ui.column():
-            ui.markdown("## Control Parameters")
             with ui.button_group():
                 ui.button(
                     "Page One",
@@ -35,14 +34,17 @@ def create_page_one():
                     color="",
                     on_click=lambda: ui.navigate.to("/audio"),
                 )
+            ui.separator()
 
-            with ui.card():
+            with ui.card().style("width: 100%"):
+                ui.markdown("## Control Parameters")
+            with ui.card().tight().style("padding: 1.5rem; gap: 0.5rem"):
                 ui.markdown("**Parameters of synthetic partials**")
                 ui.separator()
                 create_slider(21, 108, 1, show_plot, "midi1", "base midi #:")
                 create_slider(1, 32, 1, show_plot, "n_harmonics", "number of partials:")
                 create_slider(0, 1, 0.01, show_plot, "amp_decay", "amplitude decay:")
-            with ui.card():
+            with ui.card().tight().style("padding: 1.5rem; gap: 0.5rem"):
                 ui.markdown("**Parameters of dissonance curve calculation**")
                 ui.separator()
                 with ui.row():
