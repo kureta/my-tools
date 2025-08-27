@@ -3,6 +3,8 @@ from dataclasses import dataclass, field
 import librosa
 from nicegui.elements.pyplot import MatplotlibFigure
 
+from my_tools.seth import get_harmonic_spectrum
+
 
 # TODO: state and logic are too coupled
 @dataclass
@@ -24,6 +26,23 @@ class State:
 
     def has_figure(self):
         return self.__dict__.get("figure", False)
+
+    # Should be calculated only if partials parameters change
+    @property
+    def spectrum1(self):
+        return get_harmonic_spectrum(
+            self.f1,  # pyright: ignore
+            self.n_harmonics,
+            self.amp_decay,  # pyright: ignore
+        )
+
+    @property
+    def spectrum2(self):
+        return get_harmonic_spectrum(
+            self.f2,  # pyright: ignore
+            self.n_harmonics,
+            self.amp_decay,  # pyright: ignore
+        )
 
 
 state = State()

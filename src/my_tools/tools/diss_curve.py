@@ -1,7 +1,7 @@
 import numpy as np
 from nicegui import ui
 
-from my_tools.seth import dissonance, get_harmonic_spectrum, get_peaks, prepare_sweep
+from my_tools.seth import dissonance, get_peaks, prepare_sweep
 from my_tools.tools.components import LabeledSlider
 
 
@@ -51,21 +51,15 @@ class DissCurve:
 
         # TODO: move  these out of here
         # these can also be generated from audio recordings or by some other method
-        spectrum_1, amplitudes_1 = get_harmonic_spectrum(
-            self.state.f1,
-            self.state.n_harmonics,
-            self.state.amp_decay,  # pyright: ignore
-        )
-        spectrum_2, amplitudes_2 = get_harmonic_spectrum(
-            self.state.f2, self.state.n_harmonics, self.state.amp_decay
-        )
+        peaks_1, amplitudes_1 = self.state.spectrum1
+        peaks_2, amplitudes_2 = self.state.spectrum2
 
         overtone_pairs, amplitude_pairs, cents = prepare_sweep(
             self.state.f1,
-            spectrum_1,
+            peaks_1,
             amplitudes_1,
             self.state.f2,
-            spectrum_2,
+            peaks_2,
             amplitudes_2,
             self.state.start_delta_cents,
             self.state.start_delta_cents + self.state.delta_cents_range,
