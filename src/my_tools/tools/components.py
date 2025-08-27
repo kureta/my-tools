@@ -1,55 +1,27 @@
+from typing import Any, Callable, Optional, Self
+
 from nicegui import ui
 
 
 # TODO: components may be too specific, not reusable
-def create_slider(min, max, step, on_change, state, value, label):
-    with ui.row():
-        ui.label(label)
-        ui.label("").bind_text(state, value)
-    ui.slider(
-        min=min,
-        max=max,
-        step=step,
-        on_change=on_change,
-    ).classes(
-        "w-96"
-    ).bind_value(state, value)
+class LabeledSlider(ui.slider):
+    def __init__(self, min, max, step, on_change, label):
 
-
-def create_diss_curve_controls(state, show_plot):
-    with ui.card().tight().style("padding: 1.5rem; gap: 0.5rem"):
-        ui.markdown("**Parameters of dissonance curve calculation**")
-        ui.separator()
         with ui.row():
-            ui.label("Calculation method:")
-            ui.select(["min", "product"], value="min", on_change=show_plot).bind_value(
-                state, "method"
-            )
-        create_slider(
-            0,
-            2400,
-            100,
-            show_plot,
-            state,
-            "start_delta_cents",
-            "start interval (cents)",
-        )
-        create_slider(
-            1200,
-            2600,
-            100,
-            show_plot,
-            state,
-            "delta_cents_range",
-            "interval range (cents)",
-        )
-        create_slider(0, 1, 0.01, show_plot, state, "peak_cutoff", "peak cutoff:")
+            ui.label(label)
+            self.value_label = ui.label("")
+        super().__init__(min=min, max=max, step=step, on_change=on_change)
+        self.classes("w-96")
 
-
-def create_diss_curve_display(state, show_plot):
-    with ui.card():
-        with ui.row():
-            ui.label("n peaks detected:")
-            ui.label("").bind_text(state, "n_peaks")
-        state.figure = ui.matplotlib(figsize=(11, 4)).figure
-        show_plot()
+    def bind_value(
+        self,
+        target_object: Any,
+        target_name: str = "value",
+        *,
+        forward: Optional[Callable[[Any], Any]] = None,
+        backward: Optional[Callable[[Any], Any]] = None,
+    ) -> Self:
+        self.value_label.bind_text_from(target_object, target_name)
+        return super().bind_value(
+            target_object, target_name, forward=forward, backward=backward
+        )

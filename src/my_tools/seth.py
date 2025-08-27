@@ -100,31 +100,3 @@ def get_peaks(x_axis, curve, height=0.2):
     dpeaks, _ = find_peaks(second_derivative, height=height)
 
     return dpeaks, second_derivative
-
-
-def plot_curve(x_axis, curve, d2curve, dpeaks, fig):
-    fig.clear()
-
-    ax1 = fig.add_axes((0.05, 0.15, 0.9, 0.8))
-    ax2 = ax1.twinx()
-
-    ax1.plot(x_axis, curve, color="blue")
-    ax2.plot(x_axis, d2curve, color="gray", alpha=0.6)
-    ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
-
-    for xii in x_axis[dpeaks]:
-        ax1.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
-
-    ax1.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
-
-    ax1.set_xlabel("interval in cents")
-    ax1.set_ylabel("sensory dissonance")
-
-    ax2.set_ylabel("peak strength (normalized)")
-    ax1.set_xticks(
-        x_axis[dpeaks],
-        [f"{int(np.round(t))}" for t in x_axis[dpeaks]],
-    )
-    ax1.tick_params(axis="x", rotation=45, labelsize=8)
-
-    return fig

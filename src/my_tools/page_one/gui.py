@@ -1,15 +1,12 @@
 from nicegui import ui
 
-from my_tools.page_one.logic import show_plot
 from my_tools.page_one.state import state
-from my_tools.tools.components import (
-    create_diss_curve_controls,
-    create_diss_curve_display,
-    create_slider,
-)
+from my_tools.tools.components import LabeledSlider
+from my_tools.tools.diss_curve import DissCurve
 
 
 def create_page_one():
+    diss_curve = DissCurve(state)
     with ui.row():
         with ui.column():
             with ui.button_group():
@@ -30,17 +27,19 @@ def create_page_one():
             with ui.card().tight().style("padding: 1.5rem; gap: 0.5rem"):
                 ui.markdown("**Parameters of synthetic partials**")
                 ui.separator()
-                create_slider(21, 108, 1, show_plot, state, "midi1", "base midi #:")
-                create_slider(
-                    1, 32, 1, show_plot, state, "n_harmonics", "number of partials:"
-                )
-                create_slider(
-                    0, 1, 0.01, show_plot, state, "amp_decay", "amplitude decay:"
-                )
-            create_diss_curve_controls(state, show_plot)
+                LabeledSlider(
+                    21, 108, 1, diss_curve.calculate_diss_curve, "base midi #:"
+                ).bind_value(state, "midi1")
+                LabeledSlider(
+                    1, 32, 1, diss_curve.calculate_diss_curve, "number of partials:"
+                ).bind_value(state, "n_harmonics")
+                LabeledSlider(
+                    0, 1, 0.01, diss_curve.calculate_diss_curve, "amplitude decay:"
+                ).bind_value(state, "amp_decay")
+            diss_curve.create_diss_curve_controls()
 
         with ui.column():
             with ui.row():
                 ui.markdown("## Synthetic spectra")
 
-            create_diss_curve_display(state, show_plot)
+            diss_curve.create_diss_curve_display()

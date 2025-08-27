@@ -23,7 +23,7 @@ class State:
         return librosa.midi_to_hz(self.midi1)
 
     def has_figure(self):
-        return self.__dict__.get("figure") and self.figure is not None
+        return self.__dict__.get("figure", False)
 
 
 state = State()
