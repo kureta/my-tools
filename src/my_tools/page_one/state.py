@@ -1,13 +1,11 @@
-from dataclasses import dataclass, field
-
 import librosa
-from nicegui.elements.pyplot import MatplotlibFigure
+from nicegui import binding
 
 from my_tools.seth import get_harmonic_spectrum
 
 
 # TODO: state and logic are too coupled
-@dataclass
+@binding.bindable_dataclass
 class State:
     n_harmonics = 20
     midi1 = 69
@@ -18,7 +16,7 @@ class State:
     peak_cutoff = 0.2
     method = "min"
     n_peaks = 0
-    figure: MatplotlibFigure = field(init=False)
+    figure = None
 
     @property
     def f1(self):
