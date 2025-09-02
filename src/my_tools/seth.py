@@ -13,6 +13,18 @@ def get_harmonic_spectrum(f0=440.0, n_harmonics=20, decay=0.88):
     return harmonics, amplitudes
 
 
+"""
+- When creating a dissonance curve of two sets of partials, the expected
+  input shapes are: f1s, n_pairs, 2; f1s, n_pairs, 2
+- When calculating a single roughness value, they are:
+  2; 2
+- When calculating roughness curve, they are:
+  f1s, 2; 2
+"""
+
+
+# TODO: separate into two different functions; one for frequencies, one for amplitudes
+# einops.reduce using those
 def dissonance(fvec, amp, model="min"):
     """
     Given a list of partials in fvec, with amplitudes in amp, this routine
@@ -40,7 +52,7 @@ def dissonance(fvec, amp, model="min"):
     Fdif = np.max(fvec, axis=-1) - np.min(fvec, axis=-1)
 
     if model == "min":
-        a = np.amin(amp, axis=-1)
+        a = np.min(amp, axis=-1)
     elif model == "product":
         a = np.prod(amp, axis=-1)  # Older model
     else:
