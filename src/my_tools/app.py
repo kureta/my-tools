@@ -1,4 +1,4 @@
-from nicegui import binding, context, ui
+from nicegui import binding, ui
 
 from my_tools.page_one.gui import create_page_one
 from my_tools.page_two.gui import create_page_two
@@ -14,13 +14,16 @@ def audio_page():
     create_page_two()
 
 
-ui.timer(
+def bull():
+    if n_active_links := len(binding.active_links) > 0:
+        print(f"WARNING: There are {n_active_links} active links!")
+        for b in binding.active_links:
+            print(b)
+
+
+_ = ui.timer(
     1.0,
-    lambda: (
-        print("bindings:", len(binding.bindings)),
-        print("a. links:", len(binding.active_links)),
-        print("b. props:", len(binding.bindable_properties)),
-    ),
+    bull,
 )
 
 ui.run()
