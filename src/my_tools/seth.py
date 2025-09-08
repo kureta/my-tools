@@ -1,3 +1,5 @@
+# pyright: basic
+
 """
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
@@ -61,6 +63,10 @@ def dissonance(fvec, amp, model="min"):
     D = np.sum(a * (C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)), axis=-1)
 
     return D
+
+
+def roughness(frequency_pairs, axis):
+    pass
 
 
 def prepare_sweep(

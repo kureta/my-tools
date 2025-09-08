@@ -1,3 +1,5 @@
+# pyright: basic
+
 import numpy as np
 from nicegui import ui
 
