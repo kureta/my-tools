@@ -36,6 +36,20 @@ def create_page_one():
                 LabeledSlider(
                     0, 1, 0.01, diss_curve.calculate_diss_curve, "amplitude decay:"
                 ).bind_value(state, "amp_decay")
+                LabeledSlider(
+                    0.9,
+                    1.1,
+                    0.001,
+                    diss_curve.calculate_diss_curve,
+                    "spectral stretch 1:",
+                ).bind_value(state, "stretch_1")
+                LabeledSlider(
+                    0.95,
+                    1.05,
+                    0.001,
+                    diss_curve.calculate_diss_curve,
+                    "spectral stretch 2:",
+                ).bind_value(state, "stretch_2")
             diss_curve.create_diss_curve_controls()
 
         with ui.column():

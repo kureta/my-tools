@@ -8,6 +8,8 @@ from my_tools.seth import get_harmonic_spectrum
 @binding.bindable_dataclass
 class State:
     n_harmonics: int = 20
+    stretch_1: float = 1.0
+    stretch_2: float = 1.0
     midi1: int = 69
     f2: float = 440
     amp_decay: float = 0.88
@@ -29,17 +31,13 @@ class State:
     @property
     def spectrum1(self):
         return get_harmonic_spectrum(
-            self.f1,
-            self.n_harmonics,
-            self.amp_decay,
+            self.f1, self.n_harmonics, self.amp_decay, self.stretch_1
         )
 
     @property
     def spectrum2(self):
         return get_harmonic_spectrum(
-            self.f2,
-            self.n_harmonics,
-            self.amp_decay,
+            self.f2, self.n_harmonics, self.amp_decay, self.stretch_2
         )
 
 
