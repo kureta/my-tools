@@ -1,19 +1,14 @@
 import marimo
 
-__generated_with = "0.15.2"
+__generated_with = "0.15.5"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
-    import marimo as mo
     import numpy as np
     import einops as eo
-    import librosa
     from matplotlib.figure import Figure
-
-    from itertools import combinations
-    import timeit
     return Figure, eo, np
 
 
@@ -40,38 +35,47 @@ def _(np):
         D = C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)
 
         return D
-    return (f_dissonance,)
 
 
-@app.cell
-def _(np):
-    def dissonance(fdiss, amp):
-        a = np.min(amp, axis=-1)
-        D = np.sum(a * fdiss, axis=-1)
+    def dissonance(fdiss, amp, axis=-1):
+        a = np.min(amp, axis=axis)
+        D = np.sum(a * fdiss, axis=axis)
 
         return D
-    return (dissonance,)
+    return dissonance, f_dissonance
 
 
 @app.cell
 def _(dissonance, eo, f_dissonance, np):
-    n_points = 1000
-    n_partials = 6
-    f0 = 1100
+    n_points = 1000  # horizontal resolution of the dissonance curve
+    n_partials = 16  # number of partials
+    f0 = 1100  # fundamental frequency of the base voice
 
+    # define x-axis
     ratio = np.linspace(1, 2, n_points)
+    # setup frequencies of partials of the base voice
     p1 = eo.repeat(f0 * np.arange(1, 1 + n_partials), "a -> b a", b=n_points)
+    # setup frequencies of partials of the 2nd voice and sweep through f0 * [1, 2]
+    # from unison to octave of the base voice
     p2 = f0 * eo.einsum(ratio, np.arange(1, 1 + n_partials), "a, b -> a b")
+    # stack all partials
+    # p.shape = (n_points, 2*n_partials)
     p = np.concatenate((p1, p2), axis=-1)
 
-    amp1 = 1 / np.arange(1, 1 + n_partials)
-    amp2 = 1 / np.arange(1, 1 + n_partials)
+    # setup amplitudes of corresponding partials with exponential decay
+    # amp.shape = (2*n_partials) because we assume amplitudes of partials always the same
+    amp1 = 0.88 ** np.arange(n_partials)
+    amp2 = 0.88 ** np.arange(n_partials)
     amp = np.concatenate((amp1, amp2), axis=-1)
 
+    # get all pairs of indices
     idx = np.stack(np.triu_indices(n_partials * 2, k=1), axis=-1)
+    # select all pairs of partial frequencies and amplitudes
     fvec = p[..., idx]
     ampvec = amp[..., idx]
+    print(amp1.shape, amp2.shape, amp.shape, ampvec.shape)
 
+    # calculate the dissonance curve
     values = dissonance(eo.reduce(fvec, "a b 2 -> a b", f_dissonance), ampvec)
     return ratio, values
 
