@@ -4,6 +4,7 @@
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
 
+import einops as eo
 import numpy as np
 from scipy.signal import find_peaks
 
@@ -25,18 +26,7 @@ def get_harmonic_spectrum(f0=440.0, n_harmonics=20, decay=0.88):
 """
 
 
-# TODO: separate into two different functions; one for frequencies, one for amplitudes
-# einops.reduce using those
-def dissonance(fvec, amp, model="min"):
-    """
-    Given a list of partials in fvec, with amplitudes in amp, this routine
-    calculates the dissonance by summing the roughness of every sine pair
-    based on a model of Plomp-Levelt's roughness curve.
-    The older model (model='product') was based on the product of the two
-    amplitudes, but the newer model (model='min') is based on the minimum
-    of the two amplitudes, since this matches the beat frequency amplitude.
-    """
-
+def f_dissonance(fvec, axis):
     # Used to stretch dissonance curve for different freqs:
     Dstar = 0.24  # Point of maximum dissonance
     S1 = 0.0207
@@ -49,18 +39,19 @@ def dissonance(fvec, amp, model="min"):
     A1 = -3.51
     A2 = -5.75
 
-    Fmin = np.min(fvec, axis=-1)
+    Fmin = np.min(fvec, axis=axis)
     S = Dstar / (S1 * Fmin + S2)
-    Fdif = np.max(fvec, axis=-1) - np.min(fvec, axis=-1)
+    Fdif = np.max(fvec, axis=axis) - np.min(fvec, axis=axis)
 
-    if model == "min":
-        a = np.min(amp, axis=-1)
-    elif model == "product":
-        a = np.prod(amp, axis=-1)  # Older model
-    else:
-        raise ValueError('model should be "min" or "product"')
     SFdif = S * Fdif
-    D = np.sum(a * (C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)), axis=-1)
+    D = C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)
+
+    return D
+
+
+def dissonance(fdiss, amp, axis=-1):
+    a = np.min(amp, axis=axis)
+    D = np.sum(a * fdiss, axis=axis)
 
     return D
 
@@ -84,21 +75,21 @@ def prepare_sweep(
     # End point excluded to easily concatenate curves
     cents_sweep = np.linspace(start_cents, end_cents, n_points, endpoint=False)
 
-    tiled_spectrum0 = np.tile(spectrum0[None, :], (n_points, 1))
-    tiled_amp0 = np.tile(amp0[None, :], (n_points, 1))
+    tiled_spectrum0 = eo.repeat(spectrum0, "a -> b a", b=n_points)
 
-    swept_f1 = f0 * 2 ** (cents_sweep / 1200)
     normalized_spectrum1 = spectrum1 / f1
-    swept_spectrum1 = swept_f1[:, None] * normalized_spectrum1[None, :]
-    tiled_amp1 = np.tile(amp1[None, :], (n_points, 1))
+    swept_spectrum1 = f0 * eo.einsum(
+        2 ** (cents_sweep / 1200), normalized_spectrum1, "a, b -> a b"
+    )
 
-    entire_spectrum = np.concatenate([tiled_spectrum0, swept_spectrum1], axis=1)
-    entire_amps = np.concatenate([tiled_amp0, tiled_amp1], axis=1)
+    entire_spectrum = np.concatenate([tiled_spectrum0, swept_spectrum1], axis=-1)
+    entire_amps = np.concatenate([amp0, amp1], axis=-1)
 
-    i, j = np.triu_indices(entire_spectrum.shape[1], k=1)
-    idx = np.stack((i, j), axis=1)
-    bin_pairs = entire_spectrum[:, idx]
-    amp_pairs = entire_amps[:, idx]
+    # get all pairs of indices
+    idx = np.stack(np.triu_indices(len(spectrum0) * 2, k=1), axis=-1)
+    # select all pairs of partial frequencies and amplitudes
+    bin_pairs = entire_spectrum[..., idx]
+    amp_pairs = entire_amps[..., idx]
 
     return bin_pairs, amp_pairs, cents_sweep
 

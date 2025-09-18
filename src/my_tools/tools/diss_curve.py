@@ -1,9 +1,10 @@
 # pyright: basic
 
+import einops as eo
 import numpy as np
 from nicegui import ui
 
-from my_tools.seth import dissonance, get_peaks, prepare_sweep
+from my_tools.seth import dissonance, f_dissonance, get_peaks, prepare_sweep
 from my_tools.tools.components import LabeledSlider
 
 
@@ -67,7 +68,9 @@ class DissCurve:
             self.state.start_delta_cents + self.state.delta_cents_range,
         )
 
-        curve = dissonance(overtone_pairs, amplitude_pairs, self.state.method)
+        curve = dissonance(
+            eo.reduce(overtone_pairs, "a b 2 -> a b", f_dissonance), amplitude_pairs
+        )
         peaks, d2curve = get_peaks(cents, curve, height=self.state.peak_cutoff)
         self.state.n_peaks = len(peaks)
 
