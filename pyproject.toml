@@ -12,7 +12,7 @@ authors = [ { name = "kureta", email = "skureta@gmail.com" } ]
 requires-python = ">=3.13"
 classifiers = [ "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python :: 3.13" ]
 dependencies = [
-  "einops>=0.8.1",
+  "einx>=0.3.0",
   "librosa>=0.11",
   "marimo[lsp]>=0.11.21",
   "matplotlib>=3.9.4",

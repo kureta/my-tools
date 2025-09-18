@@ -4,7 +4,7 @@
 Python translation of http://sethares.engr.wisc.edu/comprog.html
 """
 
-import einops as eo
+import einx as ex
 import numpy as np
 from scipy.signal import find_peaks
 
@@ -50,14 +50,11 @@ def f_dissonance(fvec, axis):
 
 
 def dissonance(fdiss, amp, axis=-1):
+    f = ex.reduce("a... 2 -> a...", fdiss, op=f_dissonance)
     a = np.min(amp, axis=axis)
-    D = np.sum(a * fdiss, axis=axis)
+    D = np.sum(a * f, axis=axis)
 
     return D
-
-
-def roughness(frequency_pairs, axis):
-    pass
 
 
 def prepare_sweep(
@@ -75,11 +72,11 @@ def prepare_sweep(
     # End point excluded to easily concatenate curves
     cents_sweep = np.linspace(start_cents, end_cents, n_points, endpoint=False)
 
-    tiled_spectrum0 = eo.repeat(spectrum0, "a -> b a", b=n_points)
+    tiled_spectrum0 = ex.rearrange("a -> b a", spectrum0, b=n_points)
 
     normalized_spectrum1 = spectrum1 / f1
-    swept_spectrum1 = f0 * eo.einsum(
-        2 ** (cents_sweep / 1200), normalized_spectrum1, "a, b -> a b"
+    swept_spectrum1 = f0 * ex.multiply(
+        "a, b -> a b", 2 ** (cents_sweep / 1200), normalized_spectrum1
     )
 
     entire_spectrum = np.concatenate([tiled_spectrum0, swept_spectrum1], axis=-1)

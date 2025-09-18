@@ -7,9 +7,9 @@ app = marimo.App(width="medium")
 @app.cell
 def _():
     import numpy as np
-    import einops as eo
+    import einx as ex
     from matplotlib.figure import Figure
-    return Figure, eo, np
+    return Figure, ex, np
 
 
 @app.cell
@@ -46,7 +46,7 @@ def _(np):
 
 
 @app.cell
-def _(dissonance, eo, f_dissonance, np):
+def _(dissonance, ex, f_dissonance, np):
     n_points = 1000  # horizontal resolution of the dissonance curve
     n_partials = 16  # number of partials
     f0 = 1100  # fundamental frequency of the base voice
@@ -54,10 +54,10 @@ def _(dissonance, eo, f_dissonance, np):
     # define x-axis
     ratio = np.linspace(1, 2, n_points)
     # setup frequencies of partials of the base voice
-    p1 = eo.repeat(f0 * np.arange(1, 1 + n_partials), "a -> b a", b=n_points)
+    p1 = ex.rearrange("a -> b a", f0 * np.arange(1, 1 + n_partials), b=n_points)
     # setup frequencies of partials of the 2nd voice and sweep through f0 * [1, 2]
     # from unison to octave of the base voice
-    p2 = f0 * eo.einsum(ratio, np.arange(1, 1 + n_partials), "a, b -> a b")
+    p2 = f0 * ex.multiply("a, b -> a b", ratio, np.arange(1, 1 + n_partials))
     # stack all partials
     # p.shape = (n_points, 2*n_partials)
     p = np.concatenate((p1, p2), axis=-1)
@@ -73,10 +73,9 @@ def _(dissonance, eo, f_dissonance, np):
     # select all pairs of partial frequencies and amplitudes
     fvec = p[..., idx]
     ampvec = amp[..., idx]
-    print(amp1.shape, amp2.shape, amp.shape, ampvec.shape)
 
     # calculate the dissonance curve
-    values = dissonance(eo.reduce(fvec, "a b 2 -> a b", f_dissonance), ampvec)
+    values = dissonance(ex.reduce("a... 2 -> a...", fvec, op=f_dissonance), ampvec)
     return ratio, values
 
 
