@@ -1,8 +1,11 @@
 # pyright: basic
+import os
 
+os.environ["NUMEXPR_MAX_THREADS"] = "16"
+os.environ["NUMEXPR_NUM_THREADS"] = "8"
 import einx as ex
+import numexpr as ne
 import numpy as np
-from numba import njit
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
 
@@ -27,6 +30,7 @@ def generate_partial_amps(
     return amps
 
 
+# @njit(parallel=True, fastmath=True)
 def sweep_partials(
     partial_freqs: FloatArray,
     start_delta_cents: float,
@@ -39,6 +43,7 @@ def sweep_partials(
     )
     sweep_range_ratios = np.pow(2, sweep_range_cents / 1200)
     swept_partials = ex.multiply("a, ... -> a ...", sweep_range_ratios, partial_freqs)
+    # swept_partials = np.outer(sweep_range_ratios, partial_freqs)
 
     return swept_partials
 
@@ -93,6 +98,9 @@ def _get_pairs(a: FloatArray, b: FloatArray) -> FloatArray:
     return pairs
 
 
+# ======= END OF AI Generated Code =======
+
+
 def get_pairs(a: FloatArray, b: FloatArray) -> FloatArray:
     aligned_a, aligned_b = align_for_broadcast(a, b)
     pairs = _get_pairs(aligned_a, aligned_b)
@@ -100,10 +108,6 @@ def get_pairs(a: FloatArray, b: FloatArray) -> FloatArray:
     return pairs
 
 
-# ======= END OF AI Generated Code =======
-
-
-@njit(parallel=True, fastmath=True)
 def __f_dissonance(f_min: FloatArray, f_max: FloatArray) -> FloatArray:
     # Used to stretch dissonance curve for different freqs:
     Dstar = 0.24  # Point of maximum dissonance
@@ -117,11 +121,11 @@ def __f_dissonance(f_min: FloatArray, f_max: FloatArray) -> FloatArray:
     A1 = -3.51
     A2 = -5.75
 
-    S = Dstar / (S1 * f_min + S2)
-    Fdif = f_max - f_min
+    S = ne.evaluate("Dstar / (S1 * f_min + S2)")
+    Fdif = ne.evaluate("f_max - f_min")
 
-    SFdif = S * Fdif
-    D = C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)
+    SFdif = ne.evaluate("S * Fdif")
+    D = ne.evaluate("C1 * exp(A1 * SFdif) + C2 * exp(A2 * SFdif)")
 
     return D
 

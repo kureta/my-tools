@@ -1,15 +1,13 @@
 import marimo
 
-__generated_with = "0.15.5"
+__generated_with = "0.16.3"
 app = marimo.App(width="medium")
 
 
 @app.cell
 def _():
     import my_tools.seth as st
-    import einx as ex
     import matplotlib.pyplot as plt
-    import numpy as np
     return plt, st
 
 
@@ -48,9 +46,7 @@ def _(dissonance_curve, plt):
 
 @app.cell
 def _(amplitudes, st, swept_partials):
-    dc = st.dissonance(
-        swept_partials, amplitudes, swept_partials, amplitudes
-    )
+    dc = st.dissonance(swept_partials, amplitudes, swept_partials, amplitudes)
     return
 
 
