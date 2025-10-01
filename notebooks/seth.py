@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.15.0"
+__generated_with = "0.15.5"
 app = marimo.App(width="medium")
 
 
@@ -17,7 +17,7 @@ def _():
 
     import librosa
 
-    from my_tools.seth import dissonance, prepare_sweep, plot_curve, get_peaks
+    from my_tools.seth import dissonance, sweep_partials, get_peaks
     return (
         Figure,
         dissonance,
@@ -26,9 +26,8 @@ def _():
         librosa,
         mo,
         np,
-        plot_curve,
         plt,
-        prepare_sweep,
+        sweep_partials,
     )
 
 
@@ -46,7 +45,7 @@ def _(librosa, mo, np):
 
 @app.cell
 def _(librosa, mo, np, sr):
-    cello_path = "/home/kureta/Music/IRCAM/orchideaSOL2020/_OrchideaSOL2020_release/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-C2-ff-4c-N.wav"
+    cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-mf-4c-T17u.wav"
     cello, _ = librosa.load(cello_path, mono=True, sr=sr)
     cello /= np.abs(cello).max()
 
@@ -55,8 +54,8 @@ def _(librosa, mo, np, sr):
 
 
 @app.cell
-def _(find_peaks, librosa, np, sr):
-    def get_overtones(audio, min_delta_f=25.96, max_delta_db=24, max_f=4434.92):
+def _(find_peaks, np, sr):
+    def get_overtones(audio, h, min_delta_f=25.96, max_delta_db=24, max_f=4434.92):
         """Calculates peaks of the spectrum to take as overtones of a sound
 
         audio = audio
@@ -66,6 +65,7 @@ def _(find_peaks, librosa, np, sr):
         """
         # absolute value of stft (amplitudes)
         spectrum = np.abs(np.fft.rfft(audio, norm="forward"))
+        spectrum /= np.abs(spectrum).max()
         # frequency at index (bin to Hz array)
         spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
         # cut frequencies above threshold
@@ -73,12 +73,12 @@ def _(find_peaks, librosa, np, sr):
         fs = spec_freqs[filtered_freqs_idx]
         mags = spectrum[filtered_freqs_idx]
         # Convert amplitude to db
-        mags = librosa.amplitude_to_db(mags, ref=1.0, amin=1e-10, top_db=None)
+        # mags = librosa.amplitude_to_db(mags, ref=1.0, amin=1e-10, top_db=None)
         # TODO: temporary workaround for negative values messing up the dissonance curve calculation
-        mags += 100
+        # mags += 100
         # calculate overtone loudness lower limit
-        highest = mags.max()
-        lower_limit = highest - max_delta_db
+        # highest = mags.max()
+        # lower_limit = highest - max_delta_db
 
         # NOTE:
         # dissonance curve calculatiopn depends on the absolute (not relative) value of amplitudes
@@ -87,7 +87,7 @@ def _(find_peaks, librosa, np, sr):
         peaks, _ = find_peaks(
             mags,
             distance=min_delta_f / spec_freqs[1],
-            height=lower_limit,
+            height=h,
         )
 
         return fs, mags, peaks
@@ -96,7 +96,7 @@ def _(find_peaks, librosa, np, sr):
 
 @app.cell
 def _(cello, get_overtones, plt):
-    cello_fs, cello_mags, cello_peaks = get_overtones(cello)
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello, h=0.02)
 
     plt.figure(figsize=(12, 6))
     plt.plot(cello_fs, cello_mags)
@@ -107,13 +107,42 @@ def _(cello, get_overtones, plt):
 
 @app.cell
 def _(get_overtones, plt, tamtam):
-    fs, mags, tamtam_peaks = get_overtones(tamtam)
+    fs, mags, tamtam_peaks = get_overtones(tamtam, h=0.08)
 
     plt.figure(figsize=(12, 6))
     plt.plot(fs, mags)
     plt.plot(fs[tamtam_peaks], mags[tamtam_peaks], "ro", label="minima")
     plt.gca()
     return fs, mags, tamtam_peaks
+
+
+@app.cell
+def _(np):
+    def plot_curve(x_axis, curve, d2curve, dpeaks, figure):
+        ax1 = figure.add_axes((0.05, 0.15, 0.9, 0.8))
+        ax2 = ax1.twinx()
+
+        ax1.plot(x_axis, curve, color="blue")
+        ax2.plot(x_axis, d2curve, color="gray", alpha=0.6)
+        ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
+
+        for xii in x_axis[dpeaks]:
+            ax1.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
+
+        ax1.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
+
+        ax1.set_xlabel("interval in cents")
+        ax1.set_ylabel("sensory dissonance")
+
+        ax2.set_ylabel("peak strength (normalized)")
+        ax1.set_xticks(
+            x_axis[dpeaks],
+            [f"{int(np.round(t))}" for t in x_axis[dpeaks]],
+        )
+        ax1.tick_params(axis="x", rotation=45, labelsize=8)
+
+        return figure
+    return (plot_curve,)
 
 
 @app.cell
@@ -128,34 +157,29 @@ def _(
     mags,
     np,
     plot_curve,
-    prepare_sweep,
+    sweep_partials,
     tamtam_peaks,
 ):
     freq1 = fs[tamtam_peaks]
     amp1 = mags[tamtam_peaks]
-    f0 = fs[tamtam_peaks][0]
+    tmp = cello_fs[cello_peaks]
+    tmp = (tmp / tmp[0]) * freq1[0]
+    freq2 = sweep_partials(tmp, 0, 1300, 1)
     amp2 = cello_mags[cello_peaks]
 
-    bin_pairs, amp_pairs, cents = prepare_sweep(
-        f0,
-        freq1,
-        amp1,
-        cello_fs[cello_peaks][0],
-        cello_fs[cello_peaks],
-        amp2,
-        0,
-        1300,
-        1,
-    )
+    cents = np.linspace(0, 1300, 1300)
+
     # calculate dissonance curve
-    dissonance_curve = dissonance(bin_pairs, amp_pairs, model="min")
+    dissonance_curve = dissonance(freq1, amp1, freq2, amp2)
     peaks, d2curve = get_peaks(cents, dissonance_curve, height=0.2)
 
     # find peaks in the dissonance curve
     height = 0.70
     print(np.round(peaks).astype(int))
+    print(freq1[0], cello_fs[cello_peaks][0], tmp[0])
     #  and plot the curve with the peaks marked
     fig = Figure(figsize=(12, 4), dpi=100)
+
     plot_curve(cents, dissonance_curve, d2curve, peaks, fig)
     return
 
@@ -182,48 +206,6 @@ def _():
     print(generate_scale(667, 1140, 12))
     # Tamtam
     print(generate_scale(291, 1207, 12))
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""## My attempt at a cleaner and faster version of the dissonance curve calculation""")
-    return
-
-
-@app.cell
-def _(Figure, dissonance, get_peaks, np, plot_curve, prepare_sweep):
-    # prepare partials
-    n_harmonics = 20
-    f1 = 440.0
-    harmonics = f1 * np.arange(1, n_harmonics + 1)
-    amps = 0.88 ** np.arange(0, n_harmonics)
-
-    # lolo
-    # freq1 = fs[tamtam_peaks]
-    # amp1 = mags[tamtam_peaks]
-    # f0 = fs[tamtam_peaks][0]
-    # freq2 = f0 * (cello_fs[cello_peaks] / cello_fs[cello_peaks][0])
-    # amp2 = cello_mags[cello_peaks]
-    # pairs_spekis, pairs_ampiks, x_axis = prepare_sweep(
-    #     f0, freq1, amp1, cello_fs[cello_peaks][0], cello_fs[cello_peaks], amp2, 0, 1300, 1
-    # )
-    # dbs = librosa.amplitude_to_db(amps, ref=1.0, amin=1e-10, top_db=None)
-    # dbs -= dbs.min()
-    # dbs += librosa.A_weighting(harmonics)
-    # prepare vectorized pairs of partials
-    pairs_spekis, pairs_ampiks, x_axis = prepare_sweep(
-        f1, harmonics, amps, f1, harmonics, amps, 0, 1300, 1
-    )
-    # calculate dissonance curve
-    curve = dissonance(pairs_spekis, pairs_ampiks, model="min")
-    ppeaks, id2curve = get_peaks(x_axis, curve, height=0.2)
-
-    # find peaks in the dissonance curve
-    k = 0.25
-    print(x_axis[ppeaks])
-    #  and plot the curve with the peaks marked
-    plot_curve(x_axis, curve, id2curve, ppeaks, Figure(figsize=(12, 4)))
     return
 
 

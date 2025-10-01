@@ -1,7 +1,8 @@
-import librosa
-from nicegui import binding
+# pyright: basic
 
-from my_tools.seth import get_harmonic_spectrum
+import librosa
+import numpy as np
+from nicegui import binding
 
 
 # TODO: state and logic are too coupled
@@ -21,24 +22,11 @@ class State:
     figure = None  # pyright: ignore[reportUnannotatedClassAttribute]
 
     @property
-    def f1(self):
+    def f1(self) -> np.floating:
         return librosa.midi_to_hz(self.midi1)
 
     def has_figure(self) -> bool:
         return self.__dict__.get("figure", None) is not None
-
-    # Should be calculated only if partials parameters change
-    @property
-    def spectrum1(self):
-        return get_harmonic_spectrum(
-            self.f1, self.n_harmonics, self.amp_decay, self.stretch_1
-        )
-
-    @property
-    def spectrum2(self):
-        return get_harmonic_spectrum(
-            self.f2, self.n_harmonics, self.amp_decay, self.stretch_2
-        )
 
 
 state = State()

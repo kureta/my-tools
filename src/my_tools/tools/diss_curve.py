@@ -3,7 +3,13 @@
 import numpy as np
 from nicegui import ui
 
-from my_tools.seth import dissonance, f_dissonance, get_peaks, prepare_sweep
+from my_tools.seth import (
+    dissonance,
+    generate_partial_amps,
+    generate_partial_freqs,
+    get_peaks,
+    sweep_partials,
+)
 from my_tools.tools.components import LabeledSlider
 
 
@@ -21,7 +27,7 @@ class DissCurve:
                     ["min", "product"], value="min", on_change=self.calculate_diss_curve
                 ).bind_value(self.state, "method")
             LabeledSlider(
-                0,
+                -1200,
                 2400,
                 100,
                 self.calculate_diss_curve,
@@ -51,23 +57,28 @@ class DissCurve:
         if not self.state.has_figure():
             return
 
-        # TODO: move  these out of here
-        # these can also be generated from audio recordings or by some other method
-        peaks_1, amplitudes_1 = self.state.spectrum1
-        peaks_2, amplitudes_2 = self.state.spectrum2
-
-        overtone_pairs, amplitude_pairs, cents = prepare_sweep(
-            self.state.f1,
-            peaks_1,
-            amplitudes_1,
-            self.state.f2,
-            peaks_2,
-            amplitudes_2,
+        partials = generate_partial_freqs(
+            self.state.f1, self.state.n_harmonics, self.state.stretch_1
+        )
+        amplitudes = generate_partial_amps(
+            1.0, self.state.n_harmonics, self.state.amp_decay
+        )
+        other_partials = generate_partial_freqs(
+            self.state.f1, self.state.n_harmonics, self.state.stretch_2
+        )
+        swept_partials = sweep_partials(
+            other_partials,
             self.state.start_delta_cents,
             self.state.start_delta_cents + self.state.delta_cents_range,
+            0.5,
+        )
+        cents = np.linspace(
+            self.state.start_delta_cents,
+            self.state.start_delta_cents + self.state.delta_cents_range,
+            len(swept_partials),
         )
 
-        curve = dissonance(overtone_pairs, amplitude_pairs)
+        curve = dissonance(partials, amplitudes, swept_partials, amplitudes)
         peaks, d2curve = get_peaks(cents, curve, height=self.state.peak_cutoff)
         self.state.n_peaks = len(peaks)
 

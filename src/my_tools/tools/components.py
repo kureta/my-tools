@@ -1,3 +1,5 @@
+# pyright: basic
+
 from typing import Any, Callable, Optional, Self
 
 from nicegui import ui
