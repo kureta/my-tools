@@ -1,4 +1,4 @@
-# pyright: standard
+# pyright: basic
 
 import einx as ex
 import numpy as np
