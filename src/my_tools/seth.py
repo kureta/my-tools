@@ -34,7 +34,9 @@ def sweep_partials(
     resolution: float = 0.5,
 ) -> FloatArray:
     num_points = round((end_delta_cents - start_delta_cents) / resolution)
-    sweep_range_cents = np.linspace(start_delta_cents, end_delta_cents, num_points)
+    sweep_range_cents = np.linspace(
+        start_delta_cents, end_delta_cents, num_points, endpoint=False
+    )
     sweep_range_ratios = np.pow(2, sweep_range_cents / 1200)
     swept_partials = ex.multiply("a, ... -> a ...", sweep_range_ratios, partial_freqs)
 

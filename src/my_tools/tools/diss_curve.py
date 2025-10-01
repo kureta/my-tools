@@ -76,6 +76,7 @@ class DissCurve:
             self.state.start_delta_cents,
             self.state.start_delta_cents + self.state.delta_cents_range,
             len(swept_partials),
+            endpoint=False,
         )
 
         curve = dissonance(partials, amplitudes, swept_partials, amplitudes)
