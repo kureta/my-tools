@@ -21,11 +21,6 @@ class DissCurve:
         with ui.card().tight().style("padding: 1.5rem; gap: 0.5rem"):
             ui.markdown("**Parameters of dissonance curve calculation**")
             ui.separator()
-            with ui.row():
-                ui.label("Calculation method:")
-                ui.select(
-                    ["min", "product"], value="min", on_change=self.calculate_diss_curve
-                ).bind_value(self.state, "method")
             LabeledSlider(
                 -1200,
                 2400,
@@ -78,6 +73,8 @@ class DissCurve:
             len(swept_partials),
             endpoint=False,
         )
+
+        print(np.any(partials > 20000) or np.any(swept_partials > 20000))
 
         curve = dissonance(partials, amplitudes, swept_partials, amplitudes)
         peaks, d2curve = get_peaks(cents, curve, height=self.state.peak_cutoff)

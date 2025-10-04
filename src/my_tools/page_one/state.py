@@ -17,7 +17,6 @@ class State:
     start_delta_cents: int = 0
     delta_cents_range: int = 1300
     peak_cutoff: float = 0.2
-    method: str = "min"
     n_peaks: int = 0
     figure = None  # pyright: ignore[reportUnannotatedClassAttribute]
 

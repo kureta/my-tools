@@ -1,10 +1,5 @@
 # pyright: basic
-import os
-
-os.environ["NUMEXPR_MAX_THREADS"] = "16"
-os.environ["NUMEXPR_NUM_THREADS"] = "8"
 import einx as ex
-import numexpr as ne
 import numpy as np
 from numpy.typing import NDArray
 from scipy.signal import find_peaks
@@ -15,7 +10,7 @@ FloatArray = NDArray[np.float64]
 def generate_partial_freqs(
     f0: float, n_partials: int = 16, stretch_factor: float = 1.0
 ) -> FloatArray:
-    ratios = np.arange(1, n_partials + 1, dtype=np.float64) ** stretch_factor
+    ratios = np.pow(np.arange(1, n_partials + 1, dtype=np.float64), stretch_factor)
     partials = f0 * ratios
 
     return partials
@@ -24,13 +19,12 @@ def generate_partial_freqs(
 def generate_partial_amps(
     amp0: float, n_partials: int, decay_factor: float = 0.88
 ) -> FloatArray:
-    factors = decay_factor ** np.arange(n_partials, dtype=np.float64)
+    factors = np.pow(decay_factor, np.arange(n_partials, dtype=np.float64))
     amps = amp0 * factors
 
     return amps
 
 
-# @njit(parallel=True, fastmath=True)
 def sweep_partials(
     partial_freqs: FloatArray,
     start_delta_cents: float,
@@ -43,7 +37,6 @@ def sweep_partials(
     )
     sweep_range_ratios = np.pow(2, sweep_range_cents / 1200)
     swept_partials = ex.multiply("a, ... -> a ...", sweep_range_ratios, partial_freqs)
-    # swept_partials = np.outer(sweep_range_ratios, partial_freqs)
 
     return swept_partials
 
@@ -121,24 +114,17 @@ def __f_dissonance(f_min: FloatArray, f_max: FloatArray) -> FloatArray:
     A1 = -3.51
     A2 = -5.75
 
-    S = ne.evaluate("Dstar / (S1 * f_min + S2)")
-    Fdif = ne.evaluate("f_max - f_min")
+    S = Dstar / (S1 * f_min + S2)
+    Fdif = f_max - f_min
 
-    SFdif = ne.evaluate("S * Fdif")
-    D = ne.evaluate("C1 * exp(A1 * SFdif) + C2 * exp(A2 * SFdif)")
+    SFdif = S * Fdif
+    D = C1 * np.exp(A1 * SFdif) + C2 * np.exp(A2 * SFdif)
 
     return D
 
 
-# numba.jit does not support np.min/max with axis
-def _get_extrema(
-    freq_pairs: FloatArray, axis: int = -1
-) -> tuple[FloatArray, FloatArray]:
-    return np.min(freq_pairs, axis=axis), np.max(freq_pairs, axis=axis)
-
-
 def _f_dissonance(freq_pairs: FloatArray, axis: int = -1) -> FloatArray:
-    f_min, f_max = _get_extrema(freq_pairs, axis)
+    f_min, f_max = np.min(freq_pairs, axis=axis), np.max(freq_pairs, axis=axis)
 
     return __f_dissonance(f_min, f_max)
 
@@ -156,6 +142,7 @@ def _dissonance(
     return D
 
 
+# TODO: We shouldn't include frequencies above Nyquist
 def dissonance(
     partials: FloatArray,
     amplitudes: FloatArray,
