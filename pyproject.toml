@@ -21,6 +21,7 @@ dependencies = [
   "numpy>=2.0.2",
   "plotly>=6.3",
   "polars>=1.25.2",
+  "pyqt6>=6.9.1",
   "ssqueezepy>=0.6.5",
   "watchdog>=6",
 ]
