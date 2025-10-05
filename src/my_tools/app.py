@@ -6,16 +6,6 @@ from my_tools.page_one.gui import create_page_one
 from my_tools.page_two.gui import create_page_two
 
 
-@ui.page("/")
-def main_page():
-    create_page_one()
-
-
-@ui.page("/audio")
-def audio_page():
-    create_page_two()
-
-
 # Prints the number of active links if there are any.
 # These reduce performance.
 def bull():
@@ -25,9 +15,22 @@ def bull():
             print(b)
 
 
-_ = ui.timer(
-    1.0,
-    bull,
-)
+@ui.page("/")
+def main_page():
+    create_page_one()
+    _ = ui.timer(
+        1.0,
+        bull,
+    )
+
+
+@ui.page("/audio")
+def audio_page():
+    create_page_two()
+    _ = ui.timer(
+        1.0,
+        bull,
+    )
+
 
 ui.run()

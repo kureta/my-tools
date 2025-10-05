@@ -164,7 +164,7 @@ def dissonance(
 # but their dissonance values are way lower.
 def get_peaks(x_axis: FloatArray, curve: FloatArray, height: float = 0.2):
     second_derivative = np.gradient(np.gradient(curve, x_axis), x_axis)
-    # second_derivative /= curve
+    second_derivative /= curve
     second_derivative -= second_derivative.min()
     second_derivative /= second_derivative.max()
     # second_derivative = np.log(second_derivative) + 3.1

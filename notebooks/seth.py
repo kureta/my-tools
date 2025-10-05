@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.16.3"
+__generated_with = "0.16.5"
 app = marimo.App(width="medium")
 
 
@@ -9,24 +9,28 @@ def _():
     # pyright: basic
 
     import marimo as mo
-    import matplotlib.pyplot as plt
     from matplotlib.figure import Figure
 
     import numpy as np
     from scipy.signal import find_peaks
 
     import librosa
+    from pathlib import Path
+    import polars as pl
+    from collections import defaultdict
 
     from my_tools.seth import dissonance, sweep_partials, get_peaks
     return (
         Figure,
+        Path,
+        defaultdict,
         dissonance,
         find_peaks,
         get_peaks,
         librosa,
         mo,
         np,
-        plt,
+        pl,
         sweep_partials,
     )
 
@@ -45,29 +49,114 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
-def _(librosa, mo, np):
+@app.cell
+def _(Path, defaultdict, librosa, pl):
+    def n_to_none(data):
+        if data == "N":
+            return None
+        return data
+
+
+    def convert_pitch(pitch: str):
+        # this discards multiphonic pitches
+        if pitch == "N" or "_" in pitch:
+            return None
+        return float(librosa.note_to_midi(pitch, round_midi=False))
+
+
+    def parse_filepath(filepath: Path):
+        category, instrument, technique = filepath.parent.parts
+
+        mute = None
+        if "+" in instrument:
+            instrument, mute = instrument.split("+")
+
+        inst, tech, pitch, dyn, instance, misc = filepath.stem.split("-")
+
+        mt = None
+        if "+" in inst:
+            inst, mt = inst.split("+")
+
+        return {
+            "category": category,
+            "instrument": instrument,
+            "mute": mute,
+            "technique": technique,
+            "inst": inst,
+            "mt": mt,
+            "tech": tech,
+            "pitch": convert_pitch(pitch),
+            "dyn": n_to_none(dyn),
+            "instance": n_to_none(instance),
+            "misc": n_to_none(misc),
+        }
+
+
+    def load_sol(sol_path):
+        data = defaultdict(list)
+        for file_path in sol_path.rglob("*.wav"):
+            for k, v in parse_filepath(file_path.relative_to(sol_path)).items():
+                data[k].append(v)
+            data["full_path"].append(file_path.absolute())
+
+        return pl.DataFrame(data)
+    return (load_sol,)
+
+
+@app.cell
+def _(Path, load_sol):
+    sol_path = Path("~/Music/IRCAM/OrchideaSOL2020/").expanduser()
+    df = load_sol(sol_path)
+    return (df,)
+
+
+@app.cell
+def _(df, mo):
+    table = mo.ui.table(df)
+    table
+    return (table,)
+
+
+@app.cell
+def _(librosa, mo, sr, table):
+    players = []
+    for path in table.value["full_path"]:
+        audio, _ = librosa.load(path, mono=True, sr=sr)
+        players.append(mo.audio(audio, sr, normalize=False))
+
+    mo.vstack(players)
+    return
+
+
+@app.cell
+def _(df, pl):
+    filtered = df.filter((pl.col("inst") == "Vc") & pl.col("pitch").is_not_null())
+    return
+
+
+@app.cell
+def _(librosa, mo):
     tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
     # tamtam_path = "/home/kureta/Music/IRCAM/CSOL_multiphonics/Winds/Multiphonics-Cl-vo/MulClBb-mulvocl-N-N-mph10.wav"
     sr = 44100
     tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
-    tamtam /= np.abs(tamtam).max()
+    # tamtam /= np.abs(tamtam).max()
 
-    mo.audio(tamtam, sr, normalize=True)
+    mo.audio(tamtam, sr, normalize=False)
     return sr, tamtam
 
 
-@app.cell(hide_code=True)
-def _(librosa, mo, np, sr):
+@app.cell
+def _(librosa, mo, sr):
     cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-mf-4c-T17u.wav"
     cello, _ = librosa.load(cello_path, mono=True, sr=sr)
-    cello /= np.abs(cello).max()
-
-    mo.audio(cello, sr, normalize=True)
+    # cello = audio
+    # cello /= np.abs(cello).max()
+    mo.audio(cello, sr, normalize=False)
     return (cello,)
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(find_peaks, librosa, np, sr):
     def get_overtones(audio, h, min_delta_f=25.96, max_delta_db=24, max_f=4434.92):
         """Calculates peaks of the spectrum to take as overtones of a sound
@@ -79,7 +168,7 @@ def _(find_peaks, librosa, np, sr):
         """
         # absolute value of stft (amplitudes)
         spectrum = np.abs(np.fft.rfft(audio, norm="forward"))
-        spectrum /= np.abs(spectrum).max()
+        # spectrum /= np.abs(spectrum).max()
         # frequency at index (bin to Hz array)
         spec_freqs = np.fft.rfftfreq(audio.shape[0]) * sr
         # cut below audible range and above some arbitrary frequency
@@ -89,10 +178,11 @@ def _(find_peaks, librosa, np, sr):
         mags = spectrum[filtered_freqs_idx]
         # Convert amplitude to db
         # THIS LINE
-        mags = librosa.amplitude_to_db(mags, ref=1.0, amin=1e-10, top_db=None)
+        mags = librosa.amplitude_to_db(mags, ref=1.0, amin=1e-20, top_db=None)
+        mags += librosa.A_weighting(fs)
         # TODO: temporary workaround for negative values messing up the dissonance curve calculation
         # AND THIS LINE FOR dB
-        mags += 100
+        mags += 180
         # calculate overtone loudness lower limit
         highest = mags.mean()
 
@@ -107,38 +197,97 @@ def _(find_peaks, librosa, np, sr):
         )
 
         # get first n loudest partials
-        this = np.flip(np.argsort(mags[peaks]))
-        peaks = peaks[this][:6]
+        # this = np.flip(np.argsort(mags[peaks]))
+        # peaks = peaks[this][:6]
 
-        return fs, mags, peaks
+        return fs, mags, peaks[:6]
     return (get_overtones,)
 
 
-@app.cell(hide_code=True)
-def _(cello, get_overtones, plt):
-    cello_fs, cello_mags, cello_peaks = get_overtones(cello, h=0.6)
+@app.cell
+def _(Figure, np):
+    def downsample(arr: np.ndarray, target_size: int) -> np.ndarray:
+        total_elements = arr.shape[0]
+        downscale_factor = int(np.ceil(total_elements / target_size))
 
-    plt.figure(figsize=(12, 6))
-    plt.plot(cello_fs, cello_mags)
-    plt.plot(cello_fs[cello_peaks], cello_mags[cello_peaks], "ro", label="minima")
-    plt.gca()
+        # Calculate missing elements
+        missing_elements = downscale_factor * target_size - total_elements
+        remaining_elements = total_elements % downscale_factor
+
+        # Pad the array to make its length divisible by the downscale factor
+        if remaining_elements != 0:
+            mean_value = np.mean(arr[-remaining_elements:])
+        else:
+            mean_value = 0
+
+        padded_arr = np.pad(
+            arr,
+            pad_width=(0, missing_elements),
+            mode="constant",
+            constant_values=mean_value,
+        )
+
+        # Reshape the array
+        reshaped_arr = padded_arr.reshape(-1, downscale_factor)
+
+        # Downsample the array by taking the mean of each block
+        return reshaped_arr.mean(axis=1)
+
+
+    def plot_curvez(x_axis, curve, dpeaks, downsamplez=2048):
+        figure = Figure(figsize=(12, 5), dpi=300)
+
+        ax1 = figure.add_axes((0.05, 0.15, 0.9, 0.8))
+
+        ax1.plot(
+            downsample(x_axis, downsamplez),
+            downsample(curve, downsamplez),
+            color="blue",
+        )
+        ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
+
+        for xii in x_axis[dpeaks]:
+            ax1.axvline(x=xii, color="b", linestyle="-", alpha=0.3)
+
+        ax1.grid(axis="y", which="major", linestyle="--", color="gray", alpha=0.7)
+
+        ax1.set_xlabel("frequency (Hz)")
+        ax1.set_ylabel("loudness (dB)")
+        orig_ticks = ax1.get_xticks()
+        filtered_ticks = orig_ticks[
+            (orig_ticks < x_axis[dpeaks].min())
+            | (orig_ticks > x_axis[dpeaks].max())
+        ][1:-1]
+        x_ticks = np.concatenate((filtered_ticks, x_axis[dpeaks]))
+        ax1.set_xticks(
+            x_ticks,
+            [f"{t:.2f}" for t in x_ticks],
+        )
+        ax1.tick_params(axis="x", rotation=45, labelsize=8)
+
+        return figure
+    return (plot_curvez,)
+
+
+@app.cell
+def _(cello, get_overtones, plot_curvez):
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello, h=1.7)
+    plot_curvez(cello_fs, cello_mags, cello_peaks)
     return cello_fs, cello_mags, cello_peaks
 
 
-@app.cell(hide_code=True)
-def _(get_overtones, plt, tamtam):
-    fs, mags, tamtam_peaks = get_overtones(tamtam, h=0.5)
-
-    plt.figure(figsize=(12, 6))
-    plt.plot(fs, mags)
-    plt.plot(fs[tamtam_peaks], mags[tamtam_peaks], "ro", label="minima")
-    plt.gca()
+@app.cell
+def _(get_overtones, plot_curvez, tamtam):
+    fs, mags, tamtam_peaks = get_overtones(tamtam, h=1.35)
+    plot_curvez(fs, mags, tamtam_peaks)
     return fs, mags, tamtam_peaks
 
 
 @app.cell(hide_code=True)
-def _(np):
-    def plot_curve(x_axis, curve, d2curve, dpeaks, figure):
+def _(Figure, np):
+    def plot_curve(x_axis, curve, d2curve, dpeaks):
+        figure = Figure(figsize=(12, 4), dpi=300)
+
         ax1 = figure.add_axes((0.05, 0.15, 0.9, 0.8))
         ax2 = ax1.twinx()
 
@@ -165,9 +314,8 @@ def _(np):
     return (plot_curve,)
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(
-    Figure,
     cello_fs,
     cello_mags,
     cello_peaks,
@@ -181,7 +329,7 @@ def _(
     sweep_partials,
     tamtam_peaks,
 ):
-    span = 1200 * 4 + 100
+    span = 1200 * 2 + 100
     freq1 = fs[tamtam_peaks]
     amp1 = mags[tamtam_peaks]
     tmp = cello_fs[cello_peaks]
@@ -203,19 +351,18 @@ def _(
     mcs = [f"{mc:.2f}" for mc in midi_cents]
 
     #  and plot the curve with the peaks marked
-    fig = Figure(figsize=(12, 4), dpi=100)
-    plot_curve(midi_cents, dissonance_curve, d2curve, peaks, fig)
+    plot_curve(midi_cents, dissonance_curve, d2curve, peaks)
     return base_midi, midi_cents, peaks, start
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(base_midi, midi_cents, peaks, start):
     print(base_midi, start)
     print([f"{round(f) / 100}" for f in midi_cents[peaks]])
     return
 
 
-@app.function(hide_code=True)
+@app.function
 def generate_scale(generator, octave, length):
     tmp = 0
     scale = []
@@ -229,7 +376,7 @@ def generate_scale(generator, octave, length):
     return scale
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _():
     # Pythagorian for 1.05
     print(generate_scale(737, 1260, 12))

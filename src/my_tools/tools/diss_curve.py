@@ -3,13 +3,8 @@
 import numpy as np
 from nicegui import ui
 
-from my_tools.seth import (
-    dissonance,
-    generate_partial_amps,
-    generate_partial_freqs,
-    get_peaks,
-    sweep_partials,
-)
+from my_tools.seth import (dissonance, generate_partial_amps,
+                           generate_partial_freqs, get_peaks, sweep_partials)
 from my_tools.tools.components import LabeledSlider
 
 
@@ -44,7 +39,7 @@ class DissCurve:
             with ui.row():
                 ui.label("n peaks detected:")
                 ui.label("").bind_text(self.state, "n_peaks")
-            self.state.figure = ui.matplotlib(figsize=(11, 4)).figure
+            self.state.figure = ui.matplotlib(figsize=(11, 4), dpi=100).figure
             self.calculate_diss_curve()
 
     # TODO: separate plotting and calculation
@@ -73,8 +68,6 @@ class DissCurve:
             len(swept_partials),
             endpoint=False,
         )
-
-        print(np.any(partials > 20000) or np.any(swept_partials > 20000))
 
         curve = dissonance(partials, amplitudes, swept_partials, amplitudes)
         peaks, d2curve = get_peaks(cents, curve, height=self.state.peak_cutoff)
