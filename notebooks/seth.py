@@ -126,6 +126,11 @@ def _(df, mo):
 
 
 @app.cell
+def _():
+    return
+
+
+@app.cell
 def _(librosa, mo, table):
     samplesz = []
     sr = 44100
@@ -161,7 +166,7 @@ def _(librosa, mo, samplesz, sr):
     cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-mf-4c-T17u.wav"
     # cello, _ = librosa.load(cello_path, mono=True, sr=sr)
     cello = librosa.effects.pitch_shift(
-        samplesz[0], sr=sr, n_steps=79, bins_per_octave=1200
+        samplesz[0], sr=sr, n_steps=41, bins_per_octave=1200
     )
     # cello /= np.abs(cello).max()
     mo.audio(cello, sr, normalize=False)
@@ -225,6 +230,7 @@ def _(Figure, np):
         idx = np.linspace(0, n - 1, target_len, dtype=int)
         return arr[idx]
 
+
     def downsample_mean(x, target_len):
         window = len(x) // target_len
         # truncate so length is divisible by window
@@ -234,7 +240,8 @@ def _(Figure, np):
         xw = x_cut.reshape(-1, window)
         # average each row
         return xw.mean(axis=1)
-    
+
+
     def plot_curvez(x_axis, curve, dpeaks, downsamplez=4000):
         figure = Figure(figsize=(12, 5), dpi=300)
 
@@ -333,9 +340,7 @@ def _(
     freq1 = generate_partial_freqs(
         librosa.midi_to_hz(42), 8, stretch_factor=1.05
     )  # fs[tamtam_peaks]
-    amp1_ = generate_partial_amps(
-        1.0, 8, decay_factor=0.88
-    )  # mags[tamtam_peaks]
+    amp1_ = generate_partial_amps(1.0, 8, decay_factor=0.88)  # mags[tamtam_peaks]
     amp1 = (
         librosa.amplitude_to_db(amp1_, ref=1.0, amin=1e-20, top_db=None)
         + librosa.A_weighting(freq1)
@@ -362,13 +367,40 @@ def _(
 
     #  and plot the curve with the peaks marked
     plot_curve(midi_cents, dissonance_curve, d2curve, peaks)
-    return base_midi, midi_cents, peaks, start
+    return amp1_, base_midi, freq1, midi_cents, peaks, start
 
 
 @app.cell
 def _(base_midi, midi_cents, peaks, start):
     print(base_midi, start)
     print([f"{round(f) / 100}" for f in midi_cents[peaks]])
+    return
+
+
+@app.cell
+def _(amp1_, freq1, librosa, np, sr):
+    t = np.linspace(0, 6, 6 * sr)
+    wave = np.zeros_like(t)
+
+    for f, a in zip(freq1, librosa.db_to_amplitude(amp1_, ref=1.0)):
+        wave += a * np.sin(2 * np.pi * f * t)
+
+    wave /= np.abs(wave).max()
+    return (wave,)
+
+
+@app.cell
+def _(Figure, wave):
+    figa = Figure(figsize=(12, 4), dpi=300)
+    axa = figa.add_axes((0.05, 0.15, 0.9, 0.8))
+    axa.plot(wave[:2048])
+    figa
+    return
+
+
+@app.cell
+def _(mo, sr, wave):
+    mo.audio(wave, sr, normalize=False)
     return
 
 
