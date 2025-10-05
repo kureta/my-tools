@@ -19,13 +19,21 @@ def _():
     import polars as pl
     from collections import defaultdict
 
-    from my_tools.seth import dissonance, sweep_partials, get_peaks
+    from my_tools.seth import (
+        dissonance,
+        sweep_partials,
+        get_peaks,
+        generate_partial_freqs,
+        generate_partial_amps,
+    )
     return (
         Figure,
         Path,
         defaultdict,
         dissonance,
         find_peaks,
+        generate_partial_amps,
+        generate_partial_freqs,
         get_peaks,
         librosa,
         mo,
@@ -118,39 +126,43 @@ def _(df, mo):
 
 
 @app.cell
-def _(librosa, mo, sr, table):
-    players = []
+def _(librosa, mo, table):
+    samplesz = []
+    sr = 44100
     for path in table.value["full_path"]:
-        audio, _ = librosa.load(path, mono=True, sr=sr)
-        players.append(mo.audio(audio, sr, normalize=False))
+        selected_sample, _ = librosa.load(path, mono=True, sr=sr)
+        samplesz.append(selected_sample)
 
-    mo.vstack(players)
-    return
+    mo.vstack(mo.audio(ss, sr, normalize=False) for ss in samplesz)
+    return samplesz, sr
 
 
 @app.cell
-def _(df, pl):
+def _(df, pl, table):
     filtered = df.filter((pl.col("inst") == "Vc") & pl.col("pitch").is_not_null())
+    table.value
     return
 
 
 @app.cell
-def _(librosa, mo):
+def _(mo, samplesz, sr):
     tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
     # tamtam_path = "/home/kureta/Music/IRCAM/CSOL_multiphonics/Winds/Multiphonics-Cl-vo/MulClBb-mulvocl-N-N-mph10.wav"
-    sr = 44100
-    tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
+    # tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
+    tamtam = samplesz[1]
     # tamtam /= np.abs(tamtam).max()
 
     mo.audio(tamtam, sr, normalize=False)
-    return sr, tamtam
+    return (tamtam,)
 
 
 @app.cell
-def _(librosa, mo, sr):
+def _(librosa, mo, samplesz, sr):
     cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-mf-4c-T17u.wav"
-    cello, _ = librosa.load(cello_path, mono=True, sr=sr)
-    # cello = audio
+    # cello, _ = librosa.load(cello_path, mono=True, sr=sr)
+    cello = librosa.effects.pitch_shift(
+        samplesz[0], sr=sr, n_steps=79, bins_per_octave=1200
+    )
     # cello /= np.abs(cello).max()
     mo.audio(cello, sr, normalize=False)
     return (cello,)
@@ -206,42 +218,31 @@ def _(find_peaks, librosa, np, sr):
 
 @app.cell
 def _(Figure, np):
-    def downsample(arr: np.ndarray, target_size: int) -> np.ndarray:
-        total_elements = arr.shape[0]
-        downscale_factor = int(np.ceil(total_elements / target_size))
+    def downsample_to(arr, target_len):
+        n = arr.size
+        if n <= target_len:
+            return arr
+        idx = np.linspace(0, n - 1, target_len, dtype=int)
+        return arr[idx]
 
-        # Calculate missing elements
-        missing_elements = downscale_factor * target_size - total_elements
-        remaining_elements = total_elements % downscale_factor
-
-        # Pad the array to make its length divisible by the downscale factor
-        if remaining_elements != 0:
-            mean_value = np.mean(arr[-remaining_elements:])
-        else:
-            mean_value = 0
-
-        padded_arr = np.pad(
-            arr,
-            pad_width=(0, missing_elements),
-            mode="constant",
-            constant_values=mean_value,
-        )
-
-        # Reshape the array
-        reshaped_arr = padded_arr.reshape(-1, downscale_factor)
-
-        # Downsample the array by taking the mean of each block
-        return reshaped_arr.mean(axis=1)
-
-
-    def plot_curvez(x_axis, curve, dpeaks, downsamplez=2048):
+    def downsample_mean(x, target_len):
+        window = len(x) // target_len
+        # truncate so length is divisible by window
+        n = len(x) - len(x) % window
+        x_cut = x[:n]
+        # reshape into (n_windows, window)
+        xw = x_cut.reshape(-1, window)
+        # average each row
+        return xw.mean(axis=1)
+    
+    def plot_curvez(x_axis, curve, dpeaks, downsamplez=4000):
         figure = Figure(figsize=(12, 5), dpi=300)
 
         ax1 = figure.add_axes((0.05, 0.15, 0.9, 0.8))
 
         ax1.plot(
-            downsample(x_axis, downsamplez),
-            downsample(curve, downsamplez),
+            downsample_mean(x_axis, downsamplez),
+            downsample_mean(curve, downsamplez),
             color="blue",
         )
         ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
@@ -271,7 +272,7 @@ def _(Figure, np):
 
 @app.cell
 def _(cello, get_overtones, plot_curvez):
-    cello_fs, cello_mags, cello_peaks = get_overtones(cello, h=1.7)
+    cello_fs, cello_mags, cello_peaks = get_overtones(cello, h=1.4)
     plot_curvez(cello_fs, cello_mags, cello_peaks)
     return cello_fs, cello_mags, cello_peaks
 
@@ -280,10 +281,10 @@ def _(cello, get_overtones, plot_curvez):
 def _(get_overtones, plot_curvez, tamtam):
     fs, mags, tamtam_peaks = get_overtones(tamtam, h=1.35)
     plot_curvez(fs, mags, tamtam_peaks)
-    return fs, mags, tamtam_peaks
+    return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(Figure, np):
     def plot_curve(x_axis, curve, d2curve, dpeaks):
         figure = Figure(figsize=(12, 4), dpi=300)
@@ -320,18 +321,27 @@ def _(
     cello_mags,
     cello_peaks,
     dissonance,
-    fs,
+    generate_partial_amps,
+    generate_partial_freqs,
     get_peaks,
     librosa,
-    mags,
     np,
     plot_curve,
     sweep_partials,
-    tamtam_peaks,
 ):
     span = 1200 * 2 + 100
-    freq1 = fs[tamtam_peaks]
-    amp1 = mags[tamtam_peaks]
+    freq1 = generate_partial_freqs(
+        librosa.midi_to_hz(42), 8, stretch_factor=1.05
+    )  # fs[tamtam_peaks]
+    amp1_ = generate_partial_amps(
+        1.0, 8, decay_factor=0.88
+    )  # mags[tamtam_peaks]
+    amp1 = (
+        librosa.amplitude_to_db(amp1_, ref=1.0, amin=1e-20, top_db=None)
+        + librosa.A_weighting(freq1)
+        + 180
+    )
+
     tmp = cello_fs[cello_peaks]
     freq2 = sweep_partials(tmp, 0, span, 1)
     amp2 = cello_mags[cello_peaks]
