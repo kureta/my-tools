@@ -10,6 +10,7 @@ def _():
 
     import marimo as mo
     from matplotlib.figure import Figure
+    import matplotlib.pyplot as plt
 
     import numpy as np
     from scipy.signal import find_peaks
@@ -25,6 +26,7 @@ def _():
         get_peaks,
         generate_partial_freqs,
         generate_partial_amps,
+        __f_dissonance
     )
     return (
         Figure,
@@ -39,6 +41,7 @@ def _():
         mo,
         np,
         pl,
+        plt,
         sweep_partials,
     )
 
@@ -126,11 +129,6 @@ def _(df, mo):
 
 
 @app.cell
-def _():
-    return
-
-
-@app.cell
 def _(librosa, mo, table):
     samplesz = []
     sr = 44100
@@ -139,7 +137,7 @@ def _(librosa, mo, table):
         samplesz.append(selected_sample)
 
     mo.vstack(mo.audio(ss, sr, normalize=False) for ss in samplesz)
-    return samplesz, sr
+    return (sr,)
 
 
 @app.cell
@@ -150,11 +148,11 @@ def _(df, pl, table):
 
 
 @app.cell
-def _(mo, samplesz, sr):
-    tamtam_path = "/home/kureta/Music/IRCAM/Orchidea_tam_tam_0.6/CSOL_tam_tam/Percussion/tympani-sticks/middle/tt-tymp_mid-ff-N.wav"
+def _(librosa, mo, sr):
+    tamtam_path = "/home/kureta/Music/IRCAM/CSOL_tam_tam/Percussion/Tamtam/double-bass-bow/tt-bow-f-N.wav"
     # tamtam_path = "/home/kureta/Music/IRCAM/CSOL_multiphonics/Winds/Multiphonics-Cl-vo/MulClBb-mulvocl-N-N-mph10.wav"
-    # tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
-    tamtam = samplesz[1]
+    tamtam, _ = librosa.load(tamtam_path, mono=True, sr=sr)
+    # tamtam = samplesz[1]
     # tamtam /= np.abs(tamtam).max()
 
     mo.audio(tamtam, sr, normalize=False)
@@ -162,12 +160,12 @@ def _(mo, samplesz, sr):
 
 
 @app.cell
-def _(librosa, mo, samplesz, sr):
-    cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-mf-4c-T17u.wav"
-    # cello, _ = librosa.load(cello_path, mono=True, sr=sr)
-    cello = librosa.effects.pitch_shift(
-        samplesz[0], sr=sr, n_steps=41, bins_per_octave=1200
-    )
+def _(librosa, mo, sr):
+    cello_path = "/home/kureta/Music/IRCAM/OrchideaSOL2020/Strings/Violoncello/ordinario/Vc-ord-F2-ff-4c-T17u.wav"
+    cello, _ = librosa.load(cello_path, mono=True, sr=sr)
+    # cello = librosa.effects.pitch_shift(
+    #     samplesz[0], sr=sr, n_steps=41, bins_per_octave=1200
+    # )
     # cello /= np.abs(cello).max()
     mo.audio(cello, sr, normalize=False)
     return (cello,)
@@ -248,8 +246,8 @@ def _(Figure, np):
         ax1 = figure.add_axes((0.05, 0.15, 0.9, 0.8))
 
         ax1.plot(
-            downsample_mean(x_axis, downsamplez),
-            downsample_mean(curve, downsamplez),
+            downsample_mean(x_axis, 1024),
+            downsample_mean(curve, 1024),
             color="blue",
         )
         ax1.plot(x_axis[dpeaks], curve[dpeaks], "ro", label="minima")
@@ -274,7 +272,7 @@ def _(Figure, np):
         ax1.tick_params(axis="x", rotation=45, labelsize=8)
 
         return figure
-    return (plot_curvez,)
+    return downsample_mean, plot_curvez
 
 
 @app.cell
@@ -288,7 +286,7 @@ def _(cello, get_overtones, plot_curvez):
 def _(get_overtones, plot_curvez, tamtam):
     fs, mags, tamtam_peaks = get_overtones(tamtam, h=1.35)
     plot_curvez(fs, mags, tamtam_peaks)
-    return
+    return fs, mags
 
 
 @app.cell
@@ -327,16 +325,16 @@ def _(
     cello_fs,
     cello_mags,
     cello_peaks,
-    dissonance,
+    downsample_mean,
+    fs,
     generate_partial_amps,
     generate_partial_freqs,
-    get_peaks,
     librosa,
+    mags,
     np,
-    plot_curve,
     sweep_partials,
 ):
-    span = 1200 * 2 + 100
+    span = 1200 * 1 + 100
     freq1 = generate_partial_freqs(
         librosa.midi_to_hz(42), 8, stretch_factor=1.05
     )  # fs[tamtam_peaks]
@@ -357,23 +355,86 @@ def _(
     start = top_midi
     midi_cents = np.linspace(start, start + span, span)
 
+
     # calculate dissonance curve
-    dissonance_curve = dissonance(freq1, amp1, freq2, amp2)
+    def minilt(x, y):
+        idx = (x < 1000) & (x > 20)
+        dfs = downsample_mean(x[idx], 512)
+        dam = downsample_mean(y[idx], 512)
+        return dfs, dam
+
+
+    cf, cm = minilt(cello_fs, cello_mags)
+    cf = sweep_partials(cf, 0, span, 1)
+    mfs, mamp = minilt(fs, mags)
+    # dissonance_curve = dissonance(*minilt(fs, mags), cf, cm)
+    # figir = Figure(figsize=(12, 4), dpi=300)
+    # bx = figir.add_axes((0.05, 0.15, 0.9, 0.8))
+    # bx.plot(dissonance_curve)
+    return amp1_, base_midi, cf, cm, freq1, mamp, mfs, midi_cents, start
+
+
+@app.cell
+def _(cf, cm, dissonance, mamp, mfs, mo, np):
+    shit = []
+    for dilim in mo.status.progress_bar(
+        cf, title="Loading", subtitle="Please wait", show_eta=True, show_rate=True
+    ):
+        val = 0.0
+        for left, right in zip(dilim, cm):
+            for first, second in zip(mfs, mamp):
+                val += dissonance(np.array([first, left]), np.array([second, right]))
+        shit.append(val)
+    return (shit,)
+
+
+@app.cell
+def _(cf, cm, mamp, mfs, plt):
+    plt.plot(cf[0], cm)
+    plt.plot(mfs, mamp)
+    return
+
+
+@app.cell
+def _(np, plt, shit):
+    curvat = np.array(shit)
+    d2 = np.gradient(np.gradient(curvat))
+    plt.plot(d2[10:])
+    plt.plot(curvat)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(
+        r"""
+    ### **TODO**
+
+    Looks like ordinary just intonation
+    """
+    )
+    return
+
+
+@app.cell
+def _(dissonance_curve, find_peaks, get_peaks, midi_cents, np, plot_curve):
     peaks, d2curve = get_peaks(midi_cents, dissonance_curve, height=0.2)
 
     # find peaks in the dissonance curve
     height = 0.70
     mcs = [f"{mc:.2f}" for mc in midi_cents]
-
+    amp_threshold = np.percentile(d2curve, 95)
+    min_distance = 14
     #  and plot the curve with the peaks marked
+    peaks, _ = find_peaks(d2curve, height=amp_threshold, distance=min_distance)
     plot_curve(midi_cents, dissonance_curve, d2curve, peaks)
-    return amp1_, base_midi, freq1, midi_cents, peaks, start
+    return (peaks,)
 
 
 @app.cell
 def _(base_midi, midi_cents, peaks, start):
     print(base_midi, start)
-    print([f"{round(f) / 100}" for f in midi_cents[peaks]])
+    print([f"{round(f - 4100) / 100}" for f in midi_cents[peaks]])
     return
 
 

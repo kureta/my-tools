@@ -32,9 +32,7 @@ def sweep_partials(
     resolution: float = 0.5,
 ) -> FloatArray:
     num_points = round((end_delta_cents - start_delta_cents) / resolution)
-    sweep_range_cents = np.linspace(
-        start_delta_cents, end_delta_cents, num_points, endpoint=False
-    )
+    sweep_range_cents = np.linspace(start_delta_cents, end_delta_cents, num_points)
     sweep_range_ratios = np.pow(2, sweep_range_cents / 1200)
     swept_partials = ex.multiply("a, ... -> a ...", sweep_range_ratios, partial_freqs)
 
@@ -164,7 +162,7 @@ def dissonance(
 # but their dissonance values are way lower.
 def get_peaks(x_axis: FloatArray, curve: FloatArray, height: float = 0.2):
     second_derivative = np.gradient(np.gradient(curve, x_axis), x_axis)
-    second_derivative /= curve
+    # second_derivative /= curve
     second_derivative -= second_derivative.min()
     second_derivative /= second_derivative.max()
     # second_derivative = np.log(second_derivative) + 3.1
