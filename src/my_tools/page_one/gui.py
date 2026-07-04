@@ -35,7 +35,10 @@ def create_page_one():
                 ).bind_value(state, "midi1")
                 _ = LabeledSlider(
                     1, 32, 1, diss_curve.calculate_diss_curve, "number of partials:"
-                ).bind_value(state, "n_harmonics")
+                ).bind_value(state, "n_harmonics_1")
+                _ = LabeledSlider(
+                    1, 32, 1, diss_curve.calculate_diss_curve, "number of partials:"
+                ).bind_value(state, "n_harmonics_2")
                 _ = LabeledSlider(
                     0, 1, 0.01, diss_curve.calculate_diss_curve, "amplitude decay:"
                 ).bind_value(state, "amp_decay")

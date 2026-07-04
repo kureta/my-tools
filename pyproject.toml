@@ -9,12 +9,18 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 authors = [ { name = "kureta", email = "skureta@gmail.com" } ]
-requires-python = ">=3.13"
-classifiers = [ "Programming Language :: Python :: 3 :: Only", "Programming Language :: Python :: 3.13" ]
+requires-python = "~=3.13"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
 dependencies = [
-  "altair>=5.5.0",
-  "dearpygui>=2.1.0",
-  "einx>=0.3.0",
+  "altair>=5.5",
+  "einx>=0.3",
   "graphviz>=0.21",
   "librosa>=0.11",
   "marimo[lsp]>=0.11.21",
@@ -29,9 +35,9 @@ dependencies = [
   "pyqt6>=6.9.1",
   "pyqtgraph>=0.13.7",
   "python-osc>=1.9.3",
+  "scipy-stubs>=1.16.2.4",
   "sounddevice>=0.5.2",
-  "ssqueezepy>=0.6.5",
-  "supriya",
+  "supriya>=25.11b0",
   "watchdog>=6",
 ]
 
@@ -51,6 +57,3 @@ watcher_on_save = "autorun"
 
 [tool.marimo.experimental]
 lsp = true
-
-[tool.uv.sources]
-supriya = { path = "../supriya", editable = true }

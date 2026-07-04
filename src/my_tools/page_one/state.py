@@ -8,7 +8,8 @@ from nicegui import binding
 # TODO: state and logic are too coupled
 @binding.bindable_dataclass
 class State:
-    n_harmonics: int = 20
+    n_harmonics_1: int = 20
+    n_harmonics_2: int = 20
     stretch_1: float = 1.0
     stretch_2: float = 1.0
     midi1: int = 69

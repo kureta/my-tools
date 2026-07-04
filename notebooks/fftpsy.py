@@ -37,15 +37,12 @@ def _():
         defaultdict,
         dissonance,
         find_peaks,
-        generate_partial_amps,
-        generate_partial_freqs,
         librosa,
         median_filter,
         mo,
         np,
         pl,
         plt,
-        sweep_partials,
     )
 
 
@@ -146,7 +143,7 @@ def _(mo):
     return
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _(SAMPLE_RATE, librosa, mo):
     def load_selected(selected):
         # if n := len(selected.value) > 10:
@@ -181,7 +178,7 @@ def _(SAMPLE_RATE, librosa, mo):
 
 @app.cell
 def _(load_selected, sol_selection):
-    samples = load_selected(sol_selection)
+    samples = sorted(load_selected(sol_selection), key=lambda x: x["pitch"])
     # play_selected(samples)
     return (samples,)
 
@@ -217,21 +214,6 @@ def _(SAMPLE_RATE, librosa, np):
 
         return frequencies, amplitudes
     return (get_spectrum_data,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(
-        r"""
-    ### **TODO**: We add `data` to `sample` `dict`, we should do the same for `fs`, `amps`, etc.
-
-    - `fs` and `amps` that are direct results of fft (I thiink we can ignore these)
-    - `fs` amd `amps` filtered for peak detection
-    - `idx` peak indices for filtered values
-    - Then remove `auto_partial_peaks` and `get_spectrum_data` from drawing functions.
-    """
-    )
-    return
 
 
 @app.cell
@@ -280,6 +262,8 @@ def _(Figure, auto_partial_peaks, get_spectrum_data, np):
 
 
     def downsample_median(x, target_len):
+        redux = x.shape[0] % target_len
+        x = x[:-redux]
         window = len(x) // target_len
         # truncate so length is divisible by window
         n = len(x) - len(x) % window
@@ -320,222 +304,7 @@ def _(draw_peaks, samples):
 
 
 @app.cell
-def _(auto_partial_peaks, downsample_median, get_spectrum_data):
-    def load_peaks(data):
-        fs, amps = get_spectrum_data(data)
-        fs, amps = downsample_median(fs, 1024), downsample_median(amps, 1024)
-        fs_peaks, amp_peaks, peaks = auto_partial_peaks(fs, amps)
-
-        return fs_peaks, amp_peaks, peaks
-    return
-
-
-@app.cell
-def _(librosa, samples):
-    librosa.midi_to_hz(samples[0]["pitch"])
-    return
-
-
-@app.cell
-def _(
-    Figure,
-    auto_partial_peaks,
-    generate_partial_amps,
-    generate_partial_freqs,
-    get_spectrum_data,
-    librosa,
-    np,
-    samples,
-    sweep_partials,
-):
-    n_partials = 16
-
-    # tmp_fs_, tmp_amp_ = get_spectrum_data(
-    #     librosa.load(
-    #         "/home/kureta/Music/titanium-gong.wav", mono=True, sr=SAMPLE_RATE
-    #     )[0]
-    # )
-    # tmp_fs, tmp_amp, tmp_idx_ = auto_partial_peaks(tmp_fs_, tmp_amp_)
-    # tmp_idx = tmp_idx_[: n_partials + 4]
-
-    tmp_fs = generate_partial_freqs(
-        librosa.midi_to_hz(samples[0]["pitch"]), 8, 1.05
-    )
-
-    # tmp_fs *= 2 ** (25.0 * np.random.randn(*tmp_fs.shape) / 1200)
-    tmp_amp = librosa.amplitude_to_db(
-        generate_partial_amps(1 / 32, 8, 0.88),
-        ref=1.0,
-        amin=1e-20,
-        top_db=None,
-    )
-    tmp_amp += librosa.A_weighting(tmp_fs) + 180
-    tmp_idx = np.arange(len(tmp_fs))
-
-    tr_fs_, tr_amp_ = get_spectrum_data(samples[0]["data"])
-    tr_fs, tr_amp, tr_idx_ = auto_partial_peaks(tr_fs_, tr_amp_)
-    tr_idx = tr_idx_[:n_partials]
-
-    # PITCH CORRECTION: Some notes are a few cents off, which skews the dissonance curve.
-    # This is a temporary solution. We should find the closest partial to the indicated pitch
-    # and adjust according to that. Also, if the closest partial is more than some cents away
-    # we can look at the one closest to its octave.
-    tr_fs = librosa.midi_to_hz(
-        librosa.hz_to_midi(tr_fs)
-        + (samples[0]["pitch"] - librosa.hz_to_midi(tr_fs[tr_idx])[0])
-    )
-
-    # tr_fs, tr_amp = tmp_fs, tmp_amp
-    # tr_idx = tmp_idx
-    s_tr_fs = sweep_partials(tr_fs[tr_idx], -100, 1300, 0.5)
-
-    fig = Figure(figsize=(12, 5), dpi=300)
-    ax = fig.add_axes((0.05, 0.15, 0.9, 0.8))
-    ax.scatter(tmp_fs[tmp_idx], tmp_amp[tmp_idx], color="red")
-    ax.scatter(tr_fs[tr_idx], tr_amp[tr_idx], color="blue")
-    # ax.plot(tmp_fs, tmp_amp)
-    fig
-    return s_tr_fs, tmp_amp, tmp_fs, tmp_idx, tr_amp, tr_fs, tr_idx
-
-
-@app.cell
-def _(dissonance, np, plt, s_tr_fs, tmp_amp, tmp_fs, tmp_idx, tr_amp, tr_idx):
-    curve = dissonance(tmp_fs[tmp_idx], tmp_amp[tmp_idx], s_tr_fs, tr_amp[tr_idx])
-    plt.plot(np.linspace(-100, 1300, 1400 * 2), curve)
-    return (curve,)
-
-
-@app.cell
-def _(curve, find_peaks, np, plt):
-    def normalize(x):
-        x -= x.min()
-        x /= x.max()
-        return x
-
-
-    d2 = normalize(np.gradient(np.gradient(curve)))
-    norm_curve = normalize(curve)
-    kinks = d2 * (1 - norm_curve)
-    peaks_, _ = find_peaks(
-        kinks, distance=33 * 2, height=np.mean(kinks) + 2 * np.std(kinks)
-    )
-    # peaks_, _ = find_peaks(kinks, distance=33 * 2, height=kinks.mean() + 2.0)
-    peaks = peaks_  # np.sort(peaks_[np.flip(np.argsort(kinks[peaks_]))][:11])
-
-    plt.scatter(np.linspace(-100, 1300, 1400 * 2)[peaks], kinks[peaks])
-    plt.plot(np.linspace(-100, 1300, 1400 * 2), kinks)
-    return (peaks,)
-
-
-@app.cell
-def _(librosa, samples, tr_fs, tr_idx):
-    tr_fs[tr_idx] / librosa.midi_to_hz(samples[0]["pitch"])
-    return
-
-
-@app.cell
-def _(librosa, tr_fs, tr_idx):
-    librosa.hz_to_midi(tr_fs[tr_idx])
-    return
-
-
-@app.cell
-def _(np, peaks):
-    harmony = list(
-        int(n) for n in np.round(np.linspace(-100, 1300, 1400 * 2)[peaks])
-    )
-    scale = harmony.copy()
-
-    for h in harmony:
-        step = (h + 702) % 1200
-        if step not in scale:
-            scale.append(step)
-
-    scale.sort()
-    scale, harmony
-    return
-
-
-@app.cell
-def _(SAMPLE_RATE, librosa, np, tmp_amp, tmp_fs):
-    t = np.linspace(0, 6, 6 * SAMPLE_RATE)
-
-    # wave = samples[1]["data"]
-
-    # wave = librosa.load(
-    #     "/home/kureta/Music/titanium-gong.wav", mono=True, sr=SAMPLE_RATE
-    # )[0]
-
-    wave = np.zeros_like(t)
-
-    for f, a in zip(
-        tmp_fs,
-        librosa.db_to_amplitude(
-            tmp_amp - librosa.A_weighting(tmp_fs) - 180, ref=1.0
-        ),
-    ):
-        wave += a * np.sin(2 * np.pi * f * t)
-    return (wave,)
-
-
-@app.cell
-def _(SAMPLE_RATE, librosa, mo, np, peaks, samples, wave):
-    # Shouldn't normalize!
-    # Get the sample with nearest pitch and shift that
-
-    ["original", mo.audio(samples[0]["data"], SAMPLE_RATE, normalize=True)] + [
-        [
-            f"{int(np.round(cents / 100) * 100)}",
-            mo.audio(
-                librosa.effects.pitch_shift(
-                    samples[0]["data"],
-                    sr=SAMPLE_RATE,
-                    n_steps=int(np.round(cents / 100) * 100) * 2,
-                    bins_per_octave=2400,
-                ),
-                SAMPLE_RATE,
-                normalize=True,
-            ),
-            f"{cents:.0f}",
-            mo.audio(
-                librosa.effects.pitch_shift(
-                    samples[0]["data"],
-                    sr=SAMPLE_RATE,
-                    n_steps=int(cents * 2),
-                    bins_per_octave=2400,
-                ),
-                SAMPLE_RATE,
-                normalize=True,
-            ),
-            mo.audio(wave, SAMPLE_RATE, normalize=True),
-        ]
-        for cents in np.linspace(-100, 1300, 1400 * 2)[peaks]
-    ]
-    return
-
-
-@app.cell
-def _(SAMPLE_RATE, mo, np):
-    scala = [
-        0,
-        85,
-        182,
-        267,
-        316,
-        386,
-        498,
-        583,
-        702,
-        765,
-        814,
-        884,
-        969,
-        1018,
-        1088,
-        1200,
-    ]
-
-
+def _(SAMPLE_RATE, np):
     def make_wave(f):
         t = np.linspace(0, 1, SAMPLE_RATE)
         wave = np.zeros_like(t)
@@ -543,21 +312,6 @@ def _(SAMPLE_RATE, mo, np):
         for f, a in zip(f * np.arange(7), 0.88 ** (np.arange(7) + 1)):
             wave += a * np.sin(2 * np.pi * f * t)
         return wave
-
-
-    [
-        mo.audio(make_wave(440 * (2 ** (s / 1200))), SAMPLE_RATE, normalize=True)
-        for s in scala
-    ]
-    return (scala,)
-
-
-@app.cell
-def _(Figure, scala):
-    fig2 = Figure(figsize=(12, 5), dpi=300)
-    ax2 = fig2.add_axes((0.05, 0.15, 0.9, 0.8))
-
-    ax2.plot([b - a for a, b in zip(scala[:-1], scala[1:])])
     return
 
 
@@ -577,9 +331,14 @@ def _(mo):
 
 @app.cell
 def _(Figure, downsample_median, get_spectrum_data, samples):
-    def do_the_thing():
+    def do_the_thing(win_size):
         fs, amps = get_spectrum_data(samples[0]["data"])
-        fs, amps = downsample_median(fs, 1024), downsample_median(amps, 1024)
+        idx = fs < 4000
+        fs, amps = fs[idx], amps[idx]
+        fs, amps = (
+            downsample_median(fs, win_size),
+            downsample_median(amps, win_size),
+        )
 
         fig = Figure(figsize=(12, 5), dpi=300)
         ax = fig.add_axes((0.05, 0.15, 0.9, 0.8))
@@ -591,18 +350,63 @@ def _(Figure, downsample_median, get_spectrum_data, samples):
 
 @app.cell
 def _(do_the_thing):
-    do_the_thing()
+    do_the_thing(1024)
     return
 
 
 @app.cell
-def _(s_tr_fs, tmp_amp, tmp_fs, tmp_idx, tr_amp, tr_idx):
-    (
-        tmp_fs[tmp_idx].shape,
-        tmp_amp[tmp_idx].shape,
-        s_tr_fs.shape,
-        tr_amp[tr_idx].shape,
-    )
+def _(downsample_median, get_spectrum_data, np, samples):
+    def do_all():
+        fss = []
+        ampss = []
+        for sample in samples:
+            fs, amps = get_spectrum_data(sample["data"])
+            idx = fs < 4000
+            fs, amps = fs[idx], amps[idx]
+            fs, amps = downsample_median(fs, 1024), downsample_median(amps, 1024)
+            fss.append(fs)
+            ampss.append(amps)
+
+        return np.vstack(fss), np.vstack(ampss)
+    return (do_all,)
+
+
+@app.cell
+def _(do_all):
+    f1, a1 = do_all()
+    return a1, f1
+
+
+@app.cell
+def _(downsample_median, get_spectrum_data, samples):
+    f0_, a0_ = get_spectrum_data(samples[0]["data"])
+    idx0 = f0_ < 4000
+    f0_, a0_ = f0_[idx0], a0_[idx0]
+    f0, a0 = downsample_median(f0_, 1024), downsample_median(a0_, 1024)
+    return a0, f0
+
+
+@app.cell
+def _(curva):
+    curva.shape
+    return
+
+
+@app.cell
+def _(a0, a1, dissonance, f0, f1):
+    curva = dissonance(f0, a0, f1, a1)
+    return (curva,)
+
+
+@app.cell
+def _(curva, plt, samples):
+    plt.plot([s["pitch"] for s in samples][:12], curva.sum(axis=0)[:12])
+    return
+
+
+@app.cell
+def _(f1):
+    f1.shape
     return
 
 

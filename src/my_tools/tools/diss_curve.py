@@ -3,8 +3,13 @@
 import numpy as np
 from nicegui import ui
 
-from my_tools.seth import (dissonance, generate_partial_amps,
-                           generate_partial_freqs, get_peaks, sweep_partials)
+from my_tools.seth import (
+    dissonance,
+    generate_partial_amps,
+    generate_partial_freqs,
+    get_peaks,
+    sweep_partials,
+)
 from my_tools.tools.components import LabeledSlider
 
 
@@ -48,13 +53,16 @@ class DissCurve:
             return
 
         partials = generate_partial_freqs(
-            self.state.f1, self.state.n_harmonics, self.state.stretch_1
+            self.state.f1, self.state.n_harmonics_1, self.state.stretch_1
         )
         amplitudes = generate_partial_amps(
-            1.0, self.state.n_harmonics, self.state.amp_decay
+            1.0, self.state.n_harmonics_1, self.state.amp_decay
         )
         other_partials = generate_partial_freqs(
-            self.state.f1, self.state.n_harmonics, self.state.stretch_2
+            self.state.f1, self.state.n_harmonics_2, self.state.stretch_2
+        )
+        other_amplitudes = generate_partial_amps(
+            1.0, self.state.n_harmonics_2, self.state.amp_decay
         )
         swept_partials = sweep_partials(
             other_partials,
@@ -69,7 +77,7 @@ class DissCurve:
             endpoint=False,
         )
 
-        curve = dissonance(partials, amplitudes, swept_partials, amplitudes)
+        curve = dissonance(partials, amplitudes, swept_partials, other_amplitudes)
         peaks, d2curve = get_peaks(cents, curve, height=self.state.peak_cutoff)
         self.state.n_peaks = len(peaks)
 
